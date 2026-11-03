@@ -120,3 +120,4 @@ class CitationVerifier:
             checks.append(check)
 
         return checks
+

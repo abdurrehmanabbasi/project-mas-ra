@@ -16,3 +16,4 @@ def test_get_checkpointer_unreachable_db_fallback():
     fake_conn = "postgresql://fake_user:fake_pass@localhost:59999/nonexistent_db"
     cp = get_checkpointer(force_memory=False, conn_string=fake_conn)
     assert isinstance(cp, MemorySaver)
+

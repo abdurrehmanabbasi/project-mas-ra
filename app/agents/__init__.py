@@ -1,6 +1,6 @@
 """Autonomous AI research agents."""
 
-__all__ = ["PlannerAgent", "ExtractorAgent", "AnalystAgent", "CriticAgent"]
+__all__ = ["PlannerAgent", "ExtractorAgent", "AnalystAgent", "CriticAgent", "ReportWriterAgent"]
 
 
 def __getattr__(name: str):
@@ -16,4 +16,7 @@ def __getattr__(name: str):
     if name == "CriticAgent":
         from app.agents.critic import CriticAgent
         return CriticAgent
+    if name == "ReportWriterAgent":
+        from app.agents.writer import ReportWriterAgent
+        return ReportWriterAgent
     raise AttributeError(f"module {__name__} has no attribute {name}")

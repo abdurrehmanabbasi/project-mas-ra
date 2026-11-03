@@ -6,6 +6,7 @@ from app.tools.paper_dedup import PaperDeduplicator
 from app.tools.paper_retriever import PaperRetriever
 from app.tools.pdf_parser import PDFParser
 from app.tools.citation_verifier import CitationVerifier
+from app.tools.report_exporter import ReportExporter
 
 __all__ = [
     "ArxivSearchTool",
@@ -14,5 +15,6 @@ __all__ = [
     "PaperRetriever",
     "PDFParser",
     "CitationVerifier",
+    "ReportExporter",
 ]
 

@@ -45,3 +45,4 @@ def get_checkpointer(
             f"Could not connect to PostgreSQL checkpointer ({e}). Falling back to in-memory checkpointer (MemorySaver)."
         )
         return MemorySaver()
+

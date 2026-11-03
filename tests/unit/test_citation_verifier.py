@@ -73,3 +73,4 @@ def test_verify_all(sample_arxiv_paper):
     assert c.url_accessible is True
     assert c.claim_supported is True
     assert c.notes is None
+

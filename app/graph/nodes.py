@@ -414,103 +414,34 @@ def mark_rejected_node(state: ResearchState) -> Dict[str, Any]:
 
 def synthesize_summary_node(state: ResearchState) -> Dict[str, Any]:
     """Synthesize structured literature review report from selected papers, synthesis, and evidence."""
-    settings = get_settings()
     question = state.get("research_question", "")
+    project_id = state.get("project_id", "default-project")
     plan = state.get("research_plan", {})
-    selected_dicts = state.get("selected_papers", [])
+    papers = [Paper.model_validate(p) for p in state.get("selected_papers", [])]
+    evidence_records = [Evidence.model_validate(e) for e in state.get("extracted_evidence", [])]
     synthesis = state.get("synthesis", {})
-    evidence_dicts = state.get("extracted_evidence", [])
-    verified_citations = state.get("verified_citations", [])
+    verified_citations = [CitationCheck.model_validate(c) for c in state.get("verified_citations", [])]
 
-    # Format paper summaries for the writer prompt
-    paper_summaries: List[str] = []
-    references: List[Dict[str, Any]] = []
+    from app.agents.writer import ReportWriterAgent
+    from app.tools.report_exporter import ReportExporter
 
-    for i, p_data in enumerate(selected_dicts):
-        p = Paper.model_validate(p_data)
-        authors_str = ", ".join(p.authors[:3]) + (" et al." if len(p.authors) > 3 else "")
-        entry = (
-            f"[{i+1}] {p.title} ({authors_str}, {p.year or 'n.d.'})\n"
-            f"Abstract: {p.abstract[:300] if p.abstract else 'No abstract available'}...\n"
-        )
-        paper_summaries.append(entry)
-        references.append({
-            "index": i + 1,
-            "title": p.title,
-            "authors": p.authors,
-            "year": p.year,
-            "doi": p.doi,
-            "sources": [s.model_dump() for s in p.sources],
-        })
+    writer = ReportWriterAgent()
+    report = writer.write_report(
+        research_question=question,
+        project_id=project_id,
+        papers=papers,
+        evidence_records=evidence_records,
+        synthesis=synthesis,
+        citation_checks=verified_citations,
+    )
 
-    # Format synthesis themes
-    synthesis_lines = []
-    for theme in synthesis.get("themes", []):
-        synthesis_lines.append(f"### Theme: {theme.get('theme_name')}\n{theme.get('description')}")
-    for comp in synthesis.get("comparisons", []):
-        synthesis_lines.append(f"- **Comparison ({comp.get('comparison_axis')})**: {comp.get('observation')}")
-    synthesis_text = "\n\n".join(synthesis_lines) or "Thematic comparison across literature."
-
-    # Format top evidence quotes
-    evidence_lines = []
-    for ev in evidence_dicts[:8]:
-        evidence_lines.append(f"- \"{ev.get('supporting_passage')}\" (Scope: {ev.get('content_scope')})")
-    evidence_summary = "\n".join(evidence_lines) or "No atomic evidence passages available."
-
-    summary_text = "\n".join(paper_summaries)
-    llm = None
-    if settings.OPENAI_API_KEY:
-        llm = ChatOpenAI(model=settings.OPENAI_MODEL_NAME, api_key=settings.OPENAI_API_KEY)
-
-    report_content = ""
-    if llm is not None and selected_dicts:
-        try:
-            prompt_content = WRITER_USER_TEMPLATE.format(
-                research_question=question,
-                objective=plan.get("objective", ""),
-                synthesis_text=synthesis_text,
-                paper_count=len(selected_dicts),
-                papers_summary=summary_text,
-                evidence_summary=evidence_summary,
-            )
-            response = llm.invoke([
-                SystemMessage(content=WRITER_SYSTEM_PROMPT),
-                HumanMessage(content=prompt_content),
-            ])
-            report_content = response.content
-        except Exception as e:
-            logger.error(f"Writer LLM error: {e}", exc_info=True)
-
-    # Heuristic report generator if LLM not present or failed
-    if not report_content:
-        report_content = (
-            f"# Literature Review: {question}\n\n"
-            f"## Abstract\nThis literature review evaluates autonomous AI research across {len(selected_dicts)} papers.\n\n"
-            f"## Objective\n{plan.get('objective', '')}\n\n"
-            f"## Thematic Synthesis\n{synthesis_text}\n\n"
-            f"## Key Grounded Evidence\n{evidence_summary}\n\n"
-            f"## Research Gaps\n"
-        )
-        for gap in synthesis.get("research_gaps", ["Benchmark contamination", "Execution cost overhead"]):
-            report_content += f"- {gap}\n"
-
-        report_content += f"\n## References ({len(selected_dicts)} Selected)\n"
-        for ref in references:
-            authors_str = ", ".join(ref['authors'][:3]) if ref['authors'] else "Unknown"
-            report_content += f"- **{ref['title']}** ({authors_str}, {ref['year'] or 'n.d.'})\n"
-
-    final_report = {
-        "title": f"Literature Review: {question}",
-        "research_question": question,
-        "objective": plan.get("objective", ""),
-        "content_markdown": report_content,
-        "selected_papers_count": len(selected_dicts),
-        "references": references,
-        "synthesis": synthesis,
-        "verified_citations": verified_citations,
-    }
+    report_dict = report.model_dump()
+    report_dict["research_question"] = question
+    report_dict["objective"] = plan.get("objective", "")
+    report_dict["selected_papers_count"] = len(papers)
+    report_dict["content_markdown"] = ReportExporter.to_markdown(report)
 
     return {
-        "final_report": final_report,
+        "final_report": report_dict,
         "status": "completed",
     }

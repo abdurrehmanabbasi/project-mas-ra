@@ -1,0 +1,256 @@
+{
+  "timestamp": "2026-11-04 02:48:44",
+  "total_benchmarks": 3,
+  "configurations": {
+    "full_multi_agent": [
+      {
+        "config_name": "full_multi_agent",
+        "benchmark_id": "bench-001",
+        "question": "How do multi-agent systems improve autonomous software engineering benchmarks?",
+        "latency_seconds": 0.03665471076965332,
+        "scores": {
+          "citation_metrics": {
+            "total_citations": 2,
+            "valid_dois_count": 2,
+            "accessible_urls_count": 2,
+            "supported_claims_count": 2,
+            "doi_validity_rate": 1.0,
+            "url_accessibility_rate": 1.0,
+            "claim_support_rate": 1.0
+          },
+          "evidence_metrics": {
+            "total_evidence_records": 6,
+            "full_text_count": 0,
+            "abstract_only_count": 0,
+            "full_text_ratio": 0.0,
+            "average_confidence": 0.75,
+            "grounded_passage_ratio": 1.0
+          },
+          "coverage_metrics": {
+            "target_topics_count": 4,
+            "covered_topics_count": 3,
+            "coverage_score": 0.75,
+            "missing_topics": [
+              "Decontamination and leakage risks"
+            ]
+          },
+          "composite_quality_score": 0.9125,
+          "execution_latency_seconds": 0.04
+        },
+        "papers_reviewed": 2,
+        "evidence_count": 6,
+        "revision_count": 2
+      },
+      {
+        "config_name": "full_multi_agent",
+        "benchmark_id": "bench-002",
+        "question": "What are the trade-offs between speculative decoding and post-training quantization in LLM inference?",
+        "latency_seconds": 0.03345155715942383,
+        "scores": {
+          "citation_metrics": {
+            "total_citations": 2,
+            "valid_dois_count": 2,
+            "accessible_urls_count": 2,
+            "supported_claims_count": 2,
+            "doi_validity_rate": 1.0,
+            "url_accessibility_rate": 1.0,
+            "claim_support_rate": 1.0
+          },
+          "evidence_metrics": {
+            "total_evidence_records": 6,
+            "full_text_count": 0,
+            "abstract_only_count": 0,
+            "full_text_ratio": 0.0,
+            "average_confidence": 0.75,
+            "grounded_passage_ratio": 1.0
+          },
+          "coverage_metrics": {
+            "target_topics_count": 4,
+            "covered_topics_count": 2,
+            "coverage_score": 0.5,
+            "missing_topics": [
+              "Memory bandwidth vs compute bound latency",
+              "Perplexity degradation under 4-bit and 8-bit quantization"
+            ]
+          },
+          "composite_quality_score": 0.825,
+          "execution_latency_seconds": 0.03
+        },
+        "papers_reviewed": 2,
+        "evidence_count": 6,
+        "revision_count": 2
+      },
+      {
+        "config_name": "full_multi_agent",
+        "benchmark_id": "bench-003",
+        "question": "How do RLHF and Direct Preference Optimization compare in mitigating language model hallucinations?",
+        "latency_seconds": 0.02994537353515625,
+        "scores": {
+          "citation_metrics": {
+            "total_citations": 2,
+            "valid_dois_count": 2,
+            "accessible_urls_count": 2,
+            "supported_claims_count": 2,
+            "doi_validity_rate": 1.0,
+            "url_accessibility_rate": 1.0,
+            "claim_support_rate": 1.0
+          },
+          "evidence_metrics": {
+            "total_evidence_records": 6,
+            "full_text_count": 0,
+            "abstract_only_count": 0,
+            "full_text_ratio": 0.0,
+            "average_confidence": 0.75,
+            "grounded_passage_ratio": 1.0
+          },
+          "coverage_metrics": {
+            "target_topics_count": 4,
+            "covered_topics_count": 2,
+            "coverage_score": 0.5,
+            "missing_topics": [
+              "Reward model exploitation and over-optimization",
+              "Data collection and human preference annotation quality"
+            ]
+          },
+          "composite_quality_score": 0.825,
+          "execution_latency_seconds": 0.03
+        },
+        "papers_reviewed": 2,
+        "evidence_count": 6,
+        "revision_count": 2
+      }
+    ],
+    "ablation_no_critic_revisions": [
+      {
+        "config_name": "ablation_no_critic_revisions",
+        "benchmark_id": "bench-001",
+        "question": "How do multi-agent systems improve autonomous software engineering benchmarks?",
+        "latency_seconds": 0.013752222061157227,
+        "scores": {
+          "citation_metrics": {
+            "total_citations": 2,
+            "valid_dois_count": 2,
+            "accessible_urls_count": 2,
+            "supported_claims_count": 2,
+            "doi_validity_rate": 1.0,
+            "url_accessibility_rate": 1.0,
+            "claim_support_rate": 1.0
+          },
+          "evidence_metrics": {
+            "total_evidence_records": 2,
+            "full_text_count": 0,
+            "abstract_only_count": 0,
+            "full_text_ratio": 0.0,
+            "average_confidence": 0.75,
+            "grounded_passage_ratio": 1.0
+          },
+          "coverage_metrics": {
+            "target_topics_count": 4,
+            "covered_topics_count": 3,
+            "coverage_score": 0.75,
+            "missing_topics": [
+              "Decontamination and leakage risks"
+            ]
+          },
+          "composite_quality_score": 0.9125,
+          "execution_latency_seconds": 0.01
+        },
+        "papers_reviewed": 2,
+        "evidence_count": 2,
+        "revision_count": 0
+      },
+      {
+        "config_name": "ablation_no_critic_revisions",
+        "benchmark_id": "bench-002",
+        "question": "What are the trade-offs between speculative decoding and post-training quantization in LLM inference?",
+        "latency_seconds": 0.013920307159423828,
+        "scores": {
+          "citation_metrics": {
+            "total_citations": 2,
+            "valid_dois_count": 2,
+            "accessible_urls_count": 2,
+            "supported_claims_count": 2,
+            "doi_validity_rate": 1.0,
+            "url_accessibility_rate": 1.0,
+            "claim_support_rate": 1.0
+          },
+          "evidence_metrics": {
+            "total_evidence_records": 2,
+            "full_text_count": 0,
+            "abstract_only_count": 0,
+            "full_text_ratio": 0.0,
+            "average_confidence": 0.75,
+            "grounded_passage_ratio": 1.0
+          },
+          "coverage_metrics": {
+            "target_topics_count": 4,
+            "covered_topics_count": 2,
+            "coverage_score": 0.5,
+            "missing_topics": [
+              "Memory bandwidth vs compute bound latency",
+              "Perplexity degradation under 4-bit and 8-bit quantization"
+            ]
+          },
+          "composite_quality_score": 0.825,
+          "execution_latency_seconds": 0.01
+        },
+        "papers_reviewed": 2,
+        "evidence_count": 2,
+        "revision_count": 0
+      },
+      {
+        "config_name": "ablation_no_critic_revisions",
+        "benchmark_id": "bench-003",
+        "question": "How do RLHF and Direct Preference Optimization compare in mitigating language model hallucinations?",
+        "latency_seconds": 0.016336679458618164,
+        "scores": {
+          "citation_metrics": {
+            "total_citations": 2,
+            "valid_dois_count": 2,
+            "accessible_urls_count": 2,
+            "supported_claims_count": 2,
+            "doi_validity_rate": 1.0,
+            "url_accessibility_rate": 1.0,
+            "claim_support_rate": 1.0
+          },
+          "evidence_metrics": {
+            "total_evidence_records": 2,
+            "full_text_count": 0,
+            "abstract_only_count": 0,
+            "full_text_ratio": 0.0,
+            "average_confidence": 0.75,
+            "grounded_passage_ratio": 1.0
+          },
+          "coverage_metrics": {
+            "target_topics_count": 4,
+            "covered_topics_count": 2,
+            "coverage_score": 0.5,
+            "missing_topics": [
+              "Reward model exploitation and over-optimization",
+              "Data collection and human preference annotation quality"
+            ]
+          },
+          "composite_quality_score": 0.825,
+          "execution_latency_seconds": 0.02
+        },
+        "papers_reviewed": 2,
+        "evidence_count": 2,
+        "revision_count": 0
+      }
+    ]
+  },
+  "summary_averages": {
+    "full_multi_agent": {
+      "avg_composite_quality_score": 0.8542,
+      "avg_claim_support_rate": 1.0,
+      "avg_topic_coverage_score": 0.5833,
+      "avg_latency_seconds": 0.03
+    },
+    "ablation_no_critic_revisions": {
+      "avg_composite_quality_score": 0.8542,
+      "avg_claim_support_rate": 1.0,
+      "avg_topic_coverage_score": 0.5833,
+      "avg_latency_seconds": 0.01
+    }
+  }
+}

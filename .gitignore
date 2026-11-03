@@ -38,3 +38,8 @@ reports/*.pdf
 reports/*.json
 reports/*.html
 
+# Databases
+*.db
+*.sqlite
+*.sqlite3
+

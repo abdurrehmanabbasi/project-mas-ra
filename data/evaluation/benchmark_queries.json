@@ -1,0 +1,50 @@
+[
+  {
+    "benchmark_id": "bench-001",
+    "domain": "Software Engineering & Multi-Agent Systems",
+    "research_question": "How do multi-agent systems improve autonomous software engineering benchmarks?",
+    "target_topics": [
+      "Role-based multi-agent coordination",
+      "Benchmark evaluation (e.g. SWE-bench, HumanEval)",
+      "Execution latency and coordination token overhead",
+      "Decontamination and leakage risks"
+    ],
+    "reference_papers": [
+      "AgentBench: Evaluating LLMs as Agents",
+      "ChatDev: Communicative Agents for Software Development",
+      "SWE-bench: Can Language Models Resolve Real-World GitHub Issues?"
+    ]
+  },
+  {
+    "benchmark_id": "bench-002",
+    "domain": "Inference Optimization & Distributed Systems",
+    "research_question": "What are the trade-offs between speculative decoding and post-training quantization in LLM inference?",
+    "target_topics": [
+      "Draft model acceptance rates in speculative execution",
+      "Memory bandwidth vs compute bound latency",
+      "Perplexity degradation under 4-bit and 8-bit quantization",
+      "Hardware acceleration trade-offs"
+    ],
+    "reference_papers": [
+      "Fast Inference from Transformers via Speculative Decoding",
+      "AWQ: Activation-aware Weight Quantization for LLM Compression and Acceleration",
+      "SmoothQuant: Accurate and Efficient Post-Training Quantization for Large Language Models"
+    ]
+  },
+  {
+    "benchmark_id": "bench-003",
+    "domain": "AI Safety & Alignment",
+    "research_question": "How do RLHF and Direct Preference Optimization compare in mitigating language model hallucinations?",
+    "target_topics": [
+      "Reward model exploitation and over-optimization",
+      "Direct Preference Optimization (DPO) mathematical stability",
+      "Factuality and truthful generation benchmarks",
+      "Data collection and human preference annotation quality"
+    ],
+    "reference_papers": [
+      "Direct Preference Optimization: Your Language Model Is Secretly a Reward Model",
+      "Training Language Models to Follow Instructions with Human Feedback",
+      "TruthfulQA: Measuring How Models Mimic Human Falsehoods"
+    ]
+  }
+]
