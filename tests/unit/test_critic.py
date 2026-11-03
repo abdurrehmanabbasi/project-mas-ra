@@ -81,3 +81,4 @@ def test_critic_budget_limit_prevents_infinite_loop(sample_research_plan, sample
 
     assert critique.needs_revision is False
     assert critique.suggested_revision_tasks == []
+

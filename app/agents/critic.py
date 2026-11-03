@@ -158,3 +158,4 @@ class CriticAgent:
             needs_revision=needs_revision,
             suggested_revision_tasks=suggested_tasks[:2],
         )
+

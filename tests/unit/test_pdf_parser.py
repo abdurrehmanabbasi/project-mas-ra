@@ -89,3 +89,4 @@ def test_fallback_to_metadata_when_abstract_missing():
     assert content.content_scope == "metadata_only"
     assert content.retrieval_status == "partial"
     assert "Charlie Test" in content.text
+

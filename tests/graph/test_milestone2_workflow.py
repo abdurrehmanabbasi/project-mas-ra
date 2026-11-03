@@ -123,3 +123,4 @@ def test_milestone2_critic_revision_loop(sample_arxiv_paper):
     assert eval_call_count == 2
     assert final_state["revision_count"] == 1
     assert final_state["status"] == "completed"
+

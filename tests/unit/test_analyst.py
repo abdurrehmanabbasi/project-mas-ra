@@ -45,3 +45,4 @@ def test_analyst_synthesis_structure(sample_arxiv_paper, sample_s2_paper):
 
     theme_names = [t["theme_name"] for t in synthesis.themes]
     assert any("Coordination" in n or "Empirical" in n for n in theme_names)
+

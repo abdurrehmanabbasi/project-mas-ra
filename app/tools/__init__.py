@@ -5,6 +5,7 @@ from app.tools.semantic_scholar import SemanticScholarTool
 from app.tools.paper_dedup import PaperDeduplicator
 from app.tools.paper_retriever import PaperRetriever
 from app.tools.pdf_parser import PDFParser
+from app.tools.citation_verifier import CitationVerifier
 
 __all__ = [
     "ArxivSearchTool",
@@ -12,5 +13,6 @@ __all__ = [
     "PaperDeduplicator",
     "PaperRetriever",
     "PDFParser",
+    "CitationVerifier",
 ]
 

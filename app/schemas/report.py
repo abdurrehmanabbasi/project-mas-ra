@@ -21,6 +21,21 @@ class CitationCheck(BaseModel):
     notes: Optional[str] = Field(default=None, description="Verification notes or discrepancy reason")
 
 
+class ReviewPackage(BaseModel):
+    """Comprehensive briefing package presented to the human reviewer during checkpoint interrupt."""
+
+    research_question: str
+    objective: str
+    selected_papers_count: int
+    papers_summary: List[Dict[str, Any]]
+    evidence_count: int
+    key_evidence: List[Dict[str, Any]]
+    critique_score: float
+    missing_topics: List[str]
+    citation_checks: List[CitationCheck]
+    unsupported_claims_count: int = 0
+
+
 class ReportSection(BaseModel):
     """A thematic section in the literature review report."""
 

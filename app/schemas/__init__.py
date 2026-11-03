@@ -22,6 +22,7 @@ from app.schemas.report import (
     CitationCheck,
     ReportSection,
     ResearchReport,
+    ReviewPackage,
 )
 from app.schemas.research import (
     ResearchPlan,
@@ -43,6 +44,7 @@ __all__ = [
     "CitationCheck",
     "ReportSection",
     "ResearchReport",
+    "ReviewPackage",
     "ProjectCreateRequest",
     "ProjectResponse",
     "RunStartRequest",

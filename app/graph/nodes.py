@@ -1,10 +1,11 @@
-"""Graph nodes executing research planning, parallel retrieval, extraction, and synthesis."""
+"""Graph nodes executing research planning, retrieval, extraction, critique, and human review."""
 
 import logging
+import uuid
 from typing import Any, Dict, List
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_openai import ChatOpenAI
-from langgraph.types import Send
+from langgraph.types import Send, interrupt
 
 from app.agents.analyst import AnalystAgent
 from app.agents.critic import CriticAgent
@@ -15,8 +16,10 @@ from app.graph.prompts import WRITER_SYSTEM_PROMPT, WRITER_USER_TEMPLATE
 from app.graph.state import ResearchState
 from app.schemas.evidence import Evidence, PaperAnalysis, ResearchSynthesis
 from app.schemas.papers import Paper, PaperContent
+from app.schemas.report import CitationCheck, ReviewPackage
 from app.schemas.research import ResearchPlan, ResearchScope, ResearchTask
 from app.tools.arxiv_search import ArxivSearchTool
+from app.tools.citation_verifier import CitationVerifier
 from app.tools.paper_dedup import PaperDeduplicator
 from app.tools.paper_retriever import PaperRetriever
 from app.tools.pdf_parser import PDFParser
@@ -88,7 +91,6 @@ def search_worker_node(payload: Dict[str, Any]) -> Dict[str, Any]:
         )
         papers.extend(s2_papers)
 
-    # Return results (state reducer will merge and deduplicate across parallel workers)
     return {
         "search_results": [p.model_dump() for p in papers],
     }
@@ -224,7 +226,7 @@ def critique_node(state: ResearchState) -> Dict[str, Any]:
 
 
 def check_critique_decision(state: ResearchState) -> str:
-    """Evaluate whether to proceed to report writing or trigger a revision loop."""
+    """Evaluate whether to trigger an automated critic revision loop or proceed to citation verification."""
     critique_dict = state.get("critique", {})
     needs_revision = critique_dict.get("needs_revision", False)
     revision_count = state.get("revision_count", 0)
@@ -237,7 +239,7 @@ def check_critique_decision(state: ResearchState) -> str:
         )
         return "prepare_revision"
 
-    return "synthesize_summary"
+    return "verify_citations"
 
 
 def prepare_revision_node(state: ResearchState) -> Dict[str, Any]:
@@ -269,6 +271,147 @@ def dispatch_revision_tasks(state: ResearchState) -> List[Send]:
     return send_tasks
 
 
+def verify_citations_node(state: ResearchState) -> Dict[str, Any]:
+    """Verify bibliographic metadata and claim grounding for cited papers."""
+    papers = [Paper.model_validate(p) for p in state.get("selected_papers", [])]
+    evidence_records = [Evidence.model_validate(e) for e in state.get("extracted_evidence", [])]
+
+    checks = CitationVerifier.verify_all(papers=papers, evidence_records=evidence_records)
+
+    return {
+        "verified_citations": [c.model_dump() for c in checks],
+        "status": "citations_verified",
+    }
+
+
+def human_review_node(state: ResearchState) -> Dict[str, Any]:
+    """Checkpoint interrupt presenting review package to human reviewer before finalization."""
+    raw_scope = state.get("scope", {})
+    if isinstance(raw_scope, ResearchScope):
+        skip_review = raw_scope.skip_human_review
+    elif isinstance(raw_scope, dict):
+        if "skip_human_review" in raw_scope:
+            skip_review = bool(raw_scope["skip_human_review"])
+        else:
+            try:
+                skip_review = ResearchScope.model_validate(raw_scope).skip_human_review
+            except Exception:
+                skip_review = True
+    else:
+        skip_review = True
+
+    papers = [Paper.model_validate(p) for p in state.get("selected_papers", [])]
+    evidence = [Evidence.model_validate(e) for e in state.get("extracted_evidence", [])]
+    critique = state.get("critique", {})
+    citation_checks = [CitationCheck.model_validate(c) for c in state.get("verified_citations", [])]
+
+    review_pkg = ReviewPackage(
+        research_question=state.get("research_question", ""),
+        objective=state.get("research_plan", {}).get("objective", ""),
+        selected_papers_count=len(papers),
+        papers_summary=[
+            {"paper_id": p.paper_id, "title": p.title, "year": p.year, "doi": p.doi}
+            for p in papers
+        ],
+        evidence_count=len(evidence),
+        key_evidence=[e.model_dump() for e in evidence[:6]],
+        critique_score=critique.get("quality_score", 1.0),
+        missing_topics=critique.get("missing_topics", []),
+        citation_checks=citation_checks,
+        unsupported_claims_count=sum(1 for c in citation_checks if not c.claim_supported),
+    )
+
+    if skip_review:
+        return {
+            "review_package": review_pkg.model_dump(),
+            "human_approved": True,
+            "human_feedback": None,
+            "status": "human_approved",
+        }
+
+    # Pause graph execution with checkpoint interrupt!
+    decision = interrupt(review_pkg.model_dump())
+
+    # When resumed via Command(resume=...):
+    action = "approve"
+    feedback = None
+    if isinstance(decision, dict):
+        action = decision.get("action", "approve")
+        feedback = decision.get("feedback")
+    elif isinstance(decision, str):
+        action = decision
+
+    if action == "approve":
+        return {
+            "review_package": review_pkg.model_dump(),
+            "human_approved": True,
+            "human_feedback": feedback,
+            "status": "human_approved",
+        }
+    elif action in ("request_revision", "revise"):
+        return {
+            "review_package": review_pkg.model_dump(),
+            "human_approved": False,
+            "human_feedback": feedback,
+            "status": "human_revision_requested",
+        }
+    else:  # reject
+        return {
+            "review_package": review_pkg.model_dump(),
+            "human_approved": False,
+            "human_feedback": feedback,
+            "status": "rejected",
+        }
+
+
+def check_human_decision(state: ResearchState) -> str:
+    """Route according to reviewer decision."""
+    status = state.get("status")
+    if status == "rejected":
+        return "mark_rejected"
+    elif status == "human_revision_requested":
+        return "prepare_human_revision"
+    return "synthesize_summary"
+
+
+def prepare_human_revision_node(state: ResearchState) -> Dict[str, Any]:
+    """Increment revision counter before dispatching human revision tasks."""
+    return {
+        "revision_count": state.get("revision_count", 0) + 1,
+        "status": "revising",
+    }
+
+
+def dispatch_human_revision_tasks(state: ResearchState) -> List[Send]:
+    """Fan-out reviewer-instructed revision search tasks."""
+    feedback = state.get("human_feedback") or "Address literature gaps and benchmark limitations"
+    raw_scope = state.get("scope", {})
+    task = ResearchTask(
+        task_id=f"human-rev-{uuid.uuid4().hex[:6]}",
+        subquestion=f"Reviewer inquiry: {feedback}",
+        query=feedback[:100],
+        keywords=feedback.split()[:5],
+        priority=1,
+    )
+    return [Send("search_worker", {"task": task.model_dump(), "scope": raw_scope})]
+
+
+def mark_rejected_node(state: ResearchState) -> Dict[str, Any]:
+    """Finalize run as rejected following human review."""
+    feedback = state.get("human_feedback") or "Research review package was rejected by reviewer."
+    question = state.get("research_question", "")
+
+    return {
+        "status": "rejected",
+        "final_report": {
+            "title": f"Rejected: {question}",
+            "research_question": question,
+            "content_markdown": f"# Research Run Rejected\n\n**Reviewer Decision:** Rejected\n\n**Feedback:** {feedback}\n\nNo report was finalized.",
+            "references": [],
+        },
+    }
+
+
 def synthesize_summary_node(state: ResearchState) -> Dict[str, Any]:
     """Synthesize structured literature review report from selected papers, synthesis, and evidence."""
     settings = get_settings()
@@ -277,6 +420,7 @@ def synthesize_summary_node(state: ResearchState) -> Dict[str, Any]:
     selected_dicts = state.get("selected_papers", [])
     synthesis = state.get("synthesis", {})
     evidence_dicts = state.get("extracted_evidence", [])
+    verified_citations = state.get("verified_citations", [])
 
     # Format paper summaries for the writer prompt
     paper_summaries: List[str] = []
@@ -363,6 +507,7 @@ def synthesize_summary_node(state: ResearchState) -> Dict[str, Any]:
         "selected_papers_count": len(selected_dicts),
         "references": references,
         "synthesis": synthesis,
+        "verified_citations": verified_citations,
     }
 
     return {

@@ -160,3 +160,4 @@ class AnalystAgent:
             disagreements=disagreements,
             research_gaps=research_gaps,
         )
+

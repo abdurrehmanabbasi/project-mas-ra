@@ -44,6 +44,7 @@ class ResearchState(TypedDict, total=False):
     synthesis: Dict[str, Any]
     critique: Dict[str, Any]
     verified_citations: List[Dict[str, Any]]
+    review_package: Dict[str, Any]
     revision_count: int
     max_revisions: int
     human_approved: bool

@@ -56,3 +56,4 @@ def test_extractor_abstract_only_scope(sample_s2_paper):
     for ev in evidence_items:
         assert ev.content_scope == "abstract_only"
         assert ev.supporting_passage in sample_s2_paper.abstract
+

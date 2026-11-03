@@ -89,3 +89,4 @@ class PaperRetriever:
         except Exception as e:
             logger.warning(f"Error retrieving PDF for '{paper.title}' from {pdf_url}: {e}")
             return None
+

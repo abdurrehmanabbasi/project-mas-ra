@@ -15,6 +15,10 @@ class ResearchScope(BaseModel):
         default_factory=lambda: ["arxiv", "semantic_scholar"],
         description="Target academic repositories",
     )
+    skip_human_review: bool = Field(
+        default=True,
+        description="Whether to bypass human review checkpoint interrupt for automated/batch execution",
+    )
 
 
 class ResearchTask(BaseModel):
