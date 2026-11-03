@@ -22,3 +22,4 @@ ENV APP_ENV=production
 ENV PYTHONUNBUFFERED=1
 
 CMD ["uvicorn", "app.api.app:app", "--host", "0.0.0.0", "--port", "8000"]
+

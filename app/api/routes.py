@@ -304,6 +304,38 @@ async def submit_human_review(run_id: str, decision: HumanReviewDecision):
 # Report & Export Endpoints
 # ---------------------------------------------------------------------------
 
+@router.get("/runs/{run_id}/papers")
+def get_run_papers(run_id: str):
+    """Retrieve discovered and selected papers for a research run."""
+    run = DatabaseService.get_run(run_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="Run not found")
+
+    graph = _get_or_create_graph(run.thread_id)
+    config = {"configurable": {"thread_id": run.thread_id}}
+    snapshot = graph.get_state(config)
+    selected = snapshot.values.get("selected_papers") or snapshot.values.get("search_results") or []
+    if not selected:
+        report_model = DatabaseService.get_report_by_run(run_id)
+        if report_model:
+            rep_data = json.loads(report_model.report_json)
+            return rep_data.get("references", [])
+    return selected
+
+
+@router.get("/runs/{run_id}/evidence")
+def get_run_evidence(run_id: str):
+    """Retrieve all grounded evidence records extracted for a research run."""
+    run = DatabaseService.get_run(run_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="Run not found")
+
+    graph = _get_or_create_graph(run.thread_id)
+    config = {"configurable": {"thread_id": run.thread_id}}
+    snapshot = graph.get_state(config)
+    return snapshot.values.get("extracted_evidence", [])
+
+
 @router.get("/runs/{run_id}/report")
 def get_run_report(run_id: str):
     """Fetch the synthesized research report JSON."""
@@ -343,3 +375,4 @@ def export_report_pdf(run_id: str):
         filename=f"literature_review_{run_id[:8]}.pdf",
         media_type="application/pdf",
     )
+

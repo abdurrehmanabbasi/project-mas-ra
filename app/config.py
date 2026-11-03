@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     # Application Environment
     APP_ENV: str = "development"
     LOG_LEVEL: str = "INFO"
+    API_AUTH_KEY: Optional[str] = None
 
     # LLM Settings
     OPENAI_API_KEY: str = ""

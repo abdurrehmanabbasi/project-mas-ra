@@ -50,3 +50,4 @@ def test_ablation_run_configuration():
         assert "scores" in result
         assert result["scores"]["composite_quality_score"] > 0.0
         assert result["papers_reviewed"] >= 1
+

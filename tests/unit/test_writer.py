@@ -94,3 +94,4 @@ def test_writer_deterministic_generation():
     assert "Alice Smith" in report.references[0]["citation_label"]
     assert len(report.research_gaps) >= 1
     assert len(report.citation_checks) == 2
+

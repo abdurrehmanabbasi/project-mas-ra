@@ -63,3 +63,4 @@ def test_export_markdown_and_pdf():
         saved_pdf = ReportExporter.export_pdf(report, pdf_path)
         assert os.path.exists(saved_pdf)
         assert os.path.getsize(saved_pdf) > 500  # Non-trivial PDF output
+

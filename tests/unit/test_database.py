@@ -67,3 +67,4 @@ def test_database_run_and_report_lifecycle():
     assert fetched_report is not None
     assert fetched_report.id == report.id
     assert "Agent Self-Refinement" in fetched_report.markdown_content
+

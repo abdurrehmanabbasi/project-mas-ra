@@ -70,3 +70,4 @@ class ReportModel(Base):
     created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
 
     run = relationship("ResearchRunModel", back_populates="reports")
+

@@ -347,3 +347,4 @@ elif menu == "Report Library":
 
         st.divider()
         st.markdown(report.markdown_content)
+

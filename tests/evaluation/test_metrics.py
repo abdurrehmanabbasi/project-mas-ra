@@ -68,3 +68,4 @@ def test_topic_coverage_metrics():
     assert res.covered_topics_count == 2
     assert "Hardware quantization and tensor parallelism" in res.missing_topics
     assert res.coverage_score == pytest.approx(0.6667, 0.001)
+

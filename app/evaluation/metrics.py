@@ -178,3 +178,4 @@ class MetricsCalculator:
             composite_quality_score=round(composite, 4),
             execution_latency_seconds=round(latency_seconds, 2),
         )
+

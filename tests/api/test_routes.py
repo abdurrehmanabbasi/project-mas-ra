@@ -117,11 +117,21 @@ def test_report_and_export_endpoints():
     rep_res = get_run_report(run.id)
     assert rep_res["title"] == "Systematic Review: Autonomous Agent Systems"
 
-    # 2. Test export markdown
+    # 2. Test papers endpoint
+    from app.api.routes import get_run_papers, get_run_evidence
+    papers = get_run_papers(run.id)
+    assert len(papers) == 1
+    assert papers[0]["paper_id"] == "p-1"
+
+    # 3. Test evidence endpoint
+    evidence = get_run_evidence(run.id)
+    assert isinstance(evidence, list)
+
+    # 4. Test export markdown
     md_res = export_report_markdown(run.id)
     assert md_res.media_type == "text/markdown"
     assert "Systematic Review" in md_res.body.decode("utf-8")
 
-    # 3. Test export PDF
+    # 5. Test export PDF
     pdf_res = export_report_pdf(run.id)
     assert pdf_res.media_type == "application/pdf"
