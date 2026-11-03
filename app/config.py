@@ -38,6 +38,8 @@ class Settings(BaseSettings):
     MAX_PAPERS_PER_TASK: int = 10
     SEARCH_TIMEOUT_SECONDS: int = 15
     MAX_REVISION_CYCLES: int = 2
+    MAX_PDF_SIZE_MB: int = 15
+    PDF_DOWNLOAD_TIMEOUT_SECONDS: int = 15
 
     # LangSmith Tracing & Observability
     LANGSMITH_TRACING: bool = False

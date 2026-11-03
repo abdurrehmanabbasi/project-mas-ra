@@ -1,4 +1,4 @@
-"""Graph nodes executing research planning, parallel retrieval, and synthesis."""
+"""Graph nodes executing research planning, parallel retrieval, extraction, and synthesis."""
 
 import logging
 from typing import Any, Dict, List
@@ -6,14 +6,20 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_openai import ChatOpenAI
 from langgraph.types import Send
 
+from app.agents.analyst import AnalystAgent
+from app.agents.critic import CriticAgent
+from app.agents.extractor import ExtractorAgent
 from app.agents.planner import PlannerAgent
 from app.config import get_settings
 from app.graph.prompts import WRITER_SYSTEM_PROMPT, WRITER_USER_TEMPLATE
 from app.graph.state import ResearchState
-from app.schemas.papers import Paper
-from app.schemas.research import ResearchScope
+from app.schemas.evidence import Evidence, PaperAnalysis, ResearchSynthesis
+from app.schemas.papers import Paper, PaperContent
+from app.schemas.research import ResearchPlan, ResearchScope, ResearchTask
 from app.tools.arxiv_search import ArxivSearchTool
 from app.tools.paper_dedup import PaperDeduplicator
+from app.tools.paper_retriever import PaperRetriever
+from app.tools.pdf_parser import PDFParser
 from app.tools.semantic_scholar import SemanticScholarTool
 
 logger = logging.getLogger(__name__)
@@ -112,12 +118,165 @@ def deduplicate_and_rank_node(state: ResearchState) -> Dict[str, Any]:
     }
 
 
+def retrieve_content_node(state: ResearchState) -> Dict[str, Any]:
+    """Download full-text PDF where accessible; otherwise gracefully fall back to abstract."""
+    raw_selected = state.get("selected_papers", [])
+    papers = [Paper.model_validate(p) for p in raw_selected]
+
+    retriever = PaperRetriever()
+    contents: List[PaperContent] = []
+
+    for paper in papers:
+        pdf_bytes = retriever.retrieve_pdf_bytes(paper)
+        content = PDFParser.parse_paper(paper, pdf_bytes=pdf_bytes)
+        contents.append(content)
+
+    return {
+        "paper_contents": [c.model_dump() for c in contents],
+        "status": "content_retrieved",
+    }
+
+
+def extract_evidence_node(state: ResearchState) -> Dict[str, Any]:
+    """Extract structured analyses and grounded atomic evidence records from paper content."""
+    raw_selected = state.get("selected_papers", [])
+    raw_contents = state.get("paper_contents", [])
+
+    papers = [Paper.model_validate(p) for p in raw_selected]
+    content_map = {c["paper_id"]: PaperContent.model_validate(c) for c in raw_contents}
+
+    extractor = ExtractorAgent()
+    analyses: List[PaperAnalysis] = []
+    evidence_records: List[Evidence] = []
+
+    for paper in papers:
+        content = content_map.get(paper.paper_id)
+        if not content:
+            content = PDFParser.parse_paper(paper, pdf_bytes=None)
+
+        analysis, ev_items = extractor.extract(paper, content)
+        analyses.append(analysis)
+        evidence_records.extend(ev_items)
+
+    return {
+        "paper_analyses": [a.model_dump() for a in analyses],
+        "extracted_evidence": [e.model_dump() for e in evidence_records],
+        "status": "evidence_extracted",
+    }
+
+
+def analyze_literature_node(state: ResearchState) -> Dict[str, Any]:
+    """Execute Analyst Agent to generate cross-paper thematic synthesis and comparisons."""
+    question = state.get("research_question", "")
+    plan_dict = state.get("research_plan", {})
+    objective = plan_dict.get("objective", f"Synthesize literature regarding: {question}")
+
+    papers = [Paper.model_validate(p) for p in state.get("selected_papers", [])]
+    analyses = [PaperAnalysis.model_validate(a) for a in state.get("paper_analyses", [])]
+    evidence_records = [Evidence.model_validate(e) for e in state.get("extracted_evidence", [])]
+
+    analyst = AnalystAgent()
+    synthesis = analyst.analyze(
+        question=question,
+        objective=objective,
+        papers=papers,
+        analyses=analyses,
+        evidence_records=evidence_records,
+    )
+
+    return {
+        "synthesis": synthesis.model_dump(),
+        "status": "analyzed",
+    }
+
+
+def critique_node(state: ResearchState) -> Dict[str, Any]:
+    """Execute Critic Agent to evaluate research coverage and identify revision tasks."""
+    plan_dict = state.get("research_plan", {})
+    plan = ResearchPlan.model_validate(plan_dict) if plan_dict else ResearchPlan(
+        research_question=state.get("research_question", ""),
+        objective="Assess literature",
+        tasks=[],
+    )
+
+    papers = [Paper.model_validate(p) for p in state.get("selected_papers", [])]
+    evidence_records = [Evidence.model_validate(e) for e in state.get("extracted_evidence", [])]
+    raw_synthesis = state.get("synthesis", {})
+    synthesis = ResearchSynthesis.model_validate(raw_synthesis) if raw_synthesis else ResearchSynthesis()
+
+    revision_count = state.get("revision_count", 0)
+    max_revisions = state.get("max_revisions", get_settings().MAX_REVISION_CYCLES)
+
+    critic = CriticAgent()
+    critique = critic.evaluate(
+        plan=plan,
+        papers=papers,
+        evidence_records=evidence_records,
+        synthesis=synthesis,
+        revision_count=revision_count,
+        max_revisions=max_revisions,
+    )
+
+    return {
+        "critique": critique.model_dump(),
+        "status": "critiqued",
+    }
+
+
+def check_critique_decision(state: ResearchState) -> str:
+    """Evaluate whether to proceed to report writing or trigger a revision loop."""
+    critique_dict = state.get("critique", {})
+    needs_revision = critique_dict.get("needs_revision", False)
+    revision_count = state.get("revision_count", 0)
+    max_revisions = state.get("max_revisions", get_settings().MAX_REVISION_CYCLES)
+    suggested_queries = critique_dict.get("suggested_revision_tasks", [])
+
+    if needs_revision and revision_count < max_revisions and suggested_queries:
+        logger.info(
+            f"Critic triggered revision cycle {revision_count + 1}/{max_revisions} with {len(suggested_queries)} queries."
+        )
+        return "prepare_revision"
+
+    return "synthesize_summary"
+
+
+def prepare_revision_node(state: ResearchState) -> Dict[str, Any]:
+    """Increment revision counter before dispatching revision search tasks."""
+    return {
+        "revision_count": state.get("revision_count", 0) + 1,
+        "status": "revising",
+    }
+
+
+def dispatch_revision_tasks(state: ResearchState) -> List[Send]:
+    """Fan-out revision search tasks to search workers."""
+    critique_dict = state.get("critique", {})
+    suggested_queries = critique_dict.get("suggested_revision_tasks", [])
+    raw_scope = state.get("scope", {})
+
+    send_tasks: List[Send] = []
+    for i, q in enumerate(suggested_queries):
+        task = ResearchTask(
+            task_id=f"rev-{i+1}",
+            subquestion=f"Targeted literature search: {q}",
+            query=q,
+            keywords=q.split(),
+            priority=1,
+        )
+        send_tasks.append(
+            Send("search_worker", {"task": task.model_dump(), "scope": raw_scope})
+        )
+    return send_tasks
+
+
 def synthesize_summary_node(state: ResearchState) -> Dict[str, Any]:
-    """Synthesize structured literature review report from selected papers."""
+    """Synthesize structured literature review report from selected papers, synthesis, and evidence."""
     settings = get_settings()
     question = state.get("research_question", "")
     plan = state.get("research_plan", {})
     selected_dicts = state.get("selected_papers", [])
+    synthesis = state.get("synthesis", {})
+    evidence_dicts = state.get("extracted_evidence", [])
 
     # Format paper summaries for the writer prompt
     paper_summaries: List[str] = []
@@ -140,6 +299,20 @@ def synthesize_summary_node(state: ResearchState) -> Dict[str, Any]:
             "sources": [s.model_dump() for s in p.sources],
         })
 
+    # Format synthesis themes
+    synthesis_lines = []
+    for theme in synthesis.get("themes", []):
+        synthesis_lines.append(f"### Theme: {theme.get('theme_name')}\n{theme.get('description')}")
+    for comp in synthesis.get("comparisons", []):
+        synthesis_lines.append(f"- **Comparison ({comp.get('comparison_axis')})**: {comp.get('observation')}")
+    synthesis_text = "\n\n".join(synthesis_lines) or "Thematic comparison across literature."
+
+    # Format top evidence quotes
+    evidence_lines = []
+    for ev in evidence_dicts[:8]:
+        evidence_lines.append(f"- \"{ev.get('supporting_passage')}\" (Scope: {ev.get('content_scope')})")
+    evidence_summary = "\n".join(evidence_lines) or "No atomic evidence passages available."
+
     summary_text = "\n".join(paper_summaries)
     llm = None
     if settings.OPENAI_API_KEY:
@@ -151,8 +324,10 @@ def synthesize_summary_node(state: ResearchState) -> Dict[str, Any]:
             prompt_content = WRITER_USER_TEMPLATE.format(
                 research_question=question,
                 objective=plan.get("objective", ""),
+                synthesis_text=synthesis_text,
                 paper_count=len(selected_dicts),
                 papers_summary=summary_text,
+                evidence_summary=evidence_summary,
             )
             response = llm.invoke([
                 SystemMessage(content=WRITER_SYSTEM_PROMPT),
@@ -166,9 +341,16 @@ def synthesize_summary_node(state: ResearchState) -> Dict[str, Any]:
     if not report_content:
         report_content = (
             f"# Literature Review: {question}\n\n"
+            f"## Abstract\nThis literature review evaluates autonomous AI research across {len(selected_dicts)} papers.\n\n"
             f"## Objective\n{plan.get('objective', '')}\n\n"
-            f"## Identified Papers ({len(selected_dicts)} Selected)\n"
+            f"## Thematic Synthesis\n{synthesis_text}\n\n"
+            f"## Key Grounded Evidence\n{evidence_summary}\n\n"
+            f"## Research Gaps\n"
         )
+        for gap in synthesis.get("research_gaps", ["Benchmark contamination", "Execution cost overhead"]):
+            report_content += f"- {gap}\n"
+
+        report_content += f"\n## References ({len(selected_dicts)} Selected)\n"
         for ref in references:
             authors_str = ", ".join(ref['authors'][:3]) if ref['authors'] else "Unknown"
             report_content += f"- **{ref['title']}** ({authors_str}, {ref['year'] or 'n.d.'})\n"
@@ -180,10 +362,10 @@ def synthesize_summary_node(state: ResearchState) -> Dict[str, Any]:
         "content_markdown": report_content,
         "selected_papers_count": len(selected_dicts),
         "references": references,
+        "synthesis": synthesis,
     }
 
     return {
         "final_report": final_report,
         "status": "completed",
     }
-

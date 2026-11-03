@@ -38,9 +38,9 @@ class ResearchState(TypedDict, total=False):
     # Reducer accumulates and deduplicates search worker outputs
     search_results: Annotated[List[Dict[str, Any]], merge_papers_reducer]
     selected_papers: List[Dict[str, Any]]
-    paper_contents: List[Dict[str, Any]]
-    extracted_evidence: List[Dict[str, Any]]
-    paper_analyses: List[Dict[str, Any]]
+    paper_contents: Annotated[List[Dict[str, Any]], operator.add]
+    extracted_evidence: Annotated[List[Dict[str, Any]], operator.add]
+    paper_analyses: Annotated[List[Dict[str, Any]], operator.add]
     synthesis: Dict[str, Any]
     critique: Dict[str, Any]
     verified_citations: List[Dict[str, Any]]
