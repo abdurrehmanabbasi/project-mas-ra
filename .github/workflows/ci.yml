@@ -51,3 +51,4 @@ jobs:
         OPENAI_API_KEY: "mock-key-ci"
       run: |
         pytest -v
+

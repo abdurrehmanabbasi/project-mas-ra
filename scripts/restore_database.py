@@ -82,3 +82,4 @@ if __name__ == "__main__":
     parser.add_argument("backup_file", type=str, help="Path to backup JSON file")
     args = parser.parse_args()
     restore_database(args.backup_file)
+

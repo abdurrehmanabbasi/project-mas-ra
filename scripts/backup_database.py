@@ -90,3 +90,4 @@ if __name__ == "__main__":
     parser.add_argument("--output-dir", type=str, default="backups", help="Target backup directory")
     args = parser.parse_args()
     backup_database(args.output_dir)
+

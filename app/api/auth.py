@@ -24,3 +24,4 @@ def verify_api_key(x_api_key: Optional[str] = Security(api_key_header)) -> bool:
             detail="Invalid or missing API key in 'X-API-Key' header",
         )
     return True
+
