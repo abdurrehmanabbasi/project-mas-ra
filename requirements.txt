@@ -1,0 +1,46 @@
+# LLM and agent orchestration
+openai
+langchain
+langchain-openai
+langgraph
+langgraph-checkpoint-postgres
+
+# Data validation
+pydantic>=2
+pydantic-settings
+
+# Academic research APIs
+arxiv
+httpx
+
+# Document Parsing & Export
+pypdf>=4.0.0
+reportlab>=4.0.0
+
+# Backend
+fastapi
+uvicorn[standard]
+
+# Frontend
+streamlit
+requests
+
+# Database & Migrations
+psycopg[binary,pool]
+sqlalchemy
+alembic>=1.13.0
+pgvector>=0.3.0
+
+# Configuration
+python-dotenv
+
+# Evaluation
+pandas
+scikit-learn
+
+# Observability
+langsmith
+
+# Testing
+pytest
+pytest-asyncio
