@@ -63,10 +63,14 @@ if "menu" not in st.session_state:
 if st.session_state.menu not in MENU_OPTIONS:
     st.session_state.menu = "Projects & New Search"
 
+if "sidebar_nav_radio" not in st.session_state:
+    st.session_state.sidebar_nav_radio = st.session_state.menu
+
 
 def navigate_to(target_menu: str, run_id: Optional[str] = None, project_id: Optional[str] = None, report_id: Optional[str] = None):
-    """Safely navigate between tabs with updated session state."""
+    """Safely navigate between tabs with synchronized session state."""
     st.session_state.menu = target_menu
+    st.session_state.sidebar_nav_radio = target_menu
     if run_id:
         st.session_state.active_run_id = run_id
     if project_id:
@@ -82,16 +86,17 @@ def navigate_to(target_menu: str, run_id: Optional[str] = None, project_id: Opti
 st.sidebar.title("🔬 MAS-RA")
 st.sidebar.caption("Autonomous AI Literature Review Assistant")
 
-nav_idx = MENU_OPTIONS.index(st.session_state.menu)
+
+def on_sidebar_nav_change():
+    st.session_state.menu = st.session_state.sidebar_nav_radio
+
+
 selected_nav = st.sidebar.radio(
     "Navigation",
     MENU_OPTIONS,
-    index=nav_idx,
     key="sidebar_nav_radio",
+    on_change=on_sidebar_nav_change,
 )
-if selected_nav != st.session_state.menu:
-    st.session_state.menu = selected_nav
-    st.rerun()
 
 st.sidebar.divider()
 
@@ -245,16 +250,18 @@ elif st.session_state.menu == "Active Run Monitor":
                 all_projects,
                 index=project_ids.index(curr_p_id),
                 format_func=lambda p: f"{p.title} ({p.created_at.strftime('%m/%d %H:%M')})",
-                key="monitor_project_select",
             )
-            st.session_state.active_project_id = sel_project.id
+            if sel_project.id != curr_p_id:
+                st.session_state.active_project_id = sel_project.id
+                st.session_state.active_run_id = None
+                st.rerun()
 
         # Runs for this project
         project_runs = [r for r in all_runs if r.project_id == sel_project.id]
 
         with col_sel2:
             if not project_runs:
-                st.selectbox("Select Run", ["No runs yet"], disabled=True)
+                st.selectbox("Select Run", ["No runs yet for this project"], disabled=True)
                 selected_run = None
             else:
                 run_ids = [r.id for r in project_runs]
@@ -265,9 +272,9 @@ elif st.session_state.menu == "Active Run Monitor":
                     project_runs,
                     index=r_idx,
                     format_func=lambda r: f"Run #{r.id[:8]} - {r.status.upper()} (Phase: {r.current_phase})",
-                    key="monitor_run_select",
                 )
-                st.session_state.active_run_id = selected_run.id
+                if selected_run and selected_run.id != curr_r_id:
+                    st.session_state.active_run_id = selected_run.id
 
         with col_sel3:
             st.write("")
@@ -285,7 +292,7 @@ elif st.session_state.menu == "Active Run Monitor":
         st.divider()
 
         if not selected_run:
-            st.warning("No runs exist for this project. Click 'Launch New Run' above to create one.")
+            st.info(f"No runs exist for '{sel_project.title}' yet. Click '➕ Launch New Run' above to create one.")
         else:
             run = DatabaseService.get_run(selected_run.id) or selected_run
 
@@ -319,9 +326,36 @@ elif st.session_state.menu == "Active Run Monitor":
                         }
 
                         try:
+                            DatabaseService.update_run_status(run_id=run.id, status="running", current_phase="executing")
                             st.write("📋 **Planner Agent**: Decomposing research inquiry into orthogonal search tasks...")
-                            final_state = graph.invoke(initial_state, config=config)
+
+                            # Stream nodes live as they execute
+                            for chunk in graph.stream(initial_state, config=config, stream_mode="updates"):
+                                for node_name, node_update in chunk.items():
+                                    if node_name == "plan_research":
+                                        p_tasks = node_update.get("research_plan", {}).get("tasks", [])
+                                        st.write(f"📋 **Planner Agent**: Formulated {len(p_tasks)} focused search sub-tasks.")
+                                    elif node_name == "search_worker":
+                                        p_list = node_update.get("selected_papers", [])
+                                        st.write(f"🔍 **Search Worker**: Retrieved {len(p_list)} candidate academic papers.")
+                                    elif node_name == "retrieve_pdfs":
+                                        st.write("📥 **PDF Retriever**: Streamed full-text passages and paper sections.")
+                                    elif node_name == "extract_evidence":
+                                        ev_list = node_update.get("extracted_evidence", [])
+                                        st.write(f"🔬 **Evidence Extractor**: Extracted {len(ev_list)} empirical claim passages.")
+                                    elif node_name == "analyze_literature":
+                                        st.write("📊 **Literature Analyst**: Generated thematic cross-paper comparative matrices.")
+                                    elif node_name == "critique":
+                                        crit_val = node_update.get("critique", {})
+                                        score = crit_val.get("quality_score", 1.0)
+                                        st.write(f"⚖️ **Critic Agent**: Scored literature coverage at {score:.2f} / 1.00.")
+                                    elif node_name == "verify_citations":
+                                        st.write("✅ **Citation Verifier**: Validated DOIs and empirical claim grounding.")
+                                    elif node_name == "synthesize_summary":
+                                        st.write("📝 **Report Writer Agent**: Literature review synthesized.")
+
                             snapshot = graph.get_state(config)
+                            final_state = snapshot.values if snapshot else {}
 
                             # Check if paused at Human Review interrupt checkpoint
                             if snapshot.next:
@@ -334,6 +368,7 @@ elif st.session_state.menu == "Active Run Monitor":
                                     papers_count=len(final_state.get("selected_papers", [])),
                                     evidence_count=len(final_state.get("extracted_evidence", [])),
                                 )
+                                time.sleep(1)
                                 navigate_to("Human Review Checkpoint", run_id=run.id, project_id=sel_project.id)
                             else:
                                 st.write("📝 **Report Writer Agent**: Compiling academic literature review report...")
@@ -355,6 +390,7 @@ elif st.session_state.menu == "Active Run Monitor":
                                     papers_count=len(final_state.get("selected_papers", [])),
                                     evidence_count=len(final_state.get("extracted_evidence", [])),
                                 )
+                                time.sleep(1)
                                 rep_id = saved_rep.id if saved_rep else None
                                 navigate_to("Report Library", run_id=run.id, project_id=sel_project.id, report_id=rep_id)
 
@@ -444,7 +480,7 @@ elif st.session_state.menu == "Human Review Checkpoint":
             pkg_data = snapshot.values.get("review_package")
 
         # Fallback to constructing preview from snapshot state values if needed
-        if not pkg_data and isinstance(snapshot.values, dict):
+        if not pkg_data and isinstance(snapshot.values, dict) and snapshot.values:
             papers = snapshot.values.get("selected_papers", [])
             evidence = snapshot.values.get("extracted_evidence", [])
             critique = snapshot.values.get("critique", {})
@@ -464,7 +500,20 @@ elif st.session_state.menu == "Human Review Checkpoint":
                 "citation_checks": citations,
             }
 
-        if pkg_data:
+        if not pkg_data and not snapshot.values and not snapshot.next:
+            st.warning("⚠️ **Thread Checkpoint Not in Active Memory**: This run was initiated in a previous server session or the memory checkpointer was reset.")
+            col_c1, col_c2 = st.columns(2)
+            with col_c1:
+                if st.button("⚡ Relaunch Run in Active Monitor", type="primary", use_container_width=True):
+                    DatabaseService.update_run_status(run_id=run.id, status="queued", current_phase="restarting")
+                    navigate_to("Active Run Monitor", run_id=run.id, project_id=run.project_id)
+            with col_c2:
+                if st.button("➕ Start Fresh Run for this Project", use_container_width=True):
+                    new_thread = f"thread-{run.project_id[:8]}-{int(time.time())}"
+                    scope = json.loads(project.scope_json or "{}") if project else {}
+                    fresh_run = DatabaseService.create_run(project_id=run.project_id, thread_id=new_thread, scope_override=scope)
+                    navigate_to("Active Run Monitor", run_id=fresh_run.id, project_id=run.project_id)
+        elif pkg_data:
             with st.container(border=True):
                 st.markdown(f"### Research Question: *{pkg_data.get('research_question')}*")
                 st.caption(f"Objective: **{pkg_data.get('objective')}**")
@@ -661,7 +710,18 @@ elif st.session_state.menu == "Report Library":
                 )
             with col_d2:
                 try:
-                    rep_data = json.loads(selected_report.report_json)
+                    rep_data = json.loads(selected_report.report_json) if selected_report.report_json else {}
+                    rep_data.setdefault("project_id", selected_report.project_id)
+                    rep_data.setdefault("report_id", selected_report.id)
+                    rep_data.setdefault("title", selected_report.title)
+                    rep_data.setdefault("abstract", "Executive abstract of systematic literature synthesis.")
+                    rep_data.setdefault("introduction", rep_data.get("abstract", "Introduction to literature review."))
+                    rep_data.setdefault("comparative_analysis", "Thematic comparative analysis across literature.")
+                    rep_data.setdefault("limitations", "Threats to validity and empirical study limitations.")
+                    rep_data.setdefault("sections", [])
+                    rep_data.setdefault("references", [])
+                    rep_data.setdefault("citation_checks", [])
+                    rep_data.setdefault("research_gaps", [])
                     rep_obj = ResearchReport.model_validate(rep_data)
                     pdf_tmp_path = os.path.join(os.environ.get("TEMP", "."), f"report_{selected_report.id[:8]}.pdf")
                     ReportExporter.export_pdf(rep_obj, pdf_tmp_path)
