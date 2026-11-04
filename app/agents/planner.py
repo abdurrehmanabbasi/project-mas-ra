@@ -53,7 +53,9 @@ class PlannerAgent:
 
         if self.llm is not None:
             try:
-                structured_llm = self.llm.with_structured_output(ResearchPlan)
+                structured_llm = self.llm.with_structured_output(
+                    ResearchPlan, method="function_calling"
+                )
                 result = structured_llm.invoke([
                     SystemMessage(content=PLANNER_SYSTEM_PROMPT),
                     HumanMessage(content=user_content),

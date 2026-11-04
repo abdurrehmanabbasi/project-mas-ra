@@ -65,7 +65,9 @@ class ExtractorAgent:
                     content_scope=content.content_scope,
                     text=trimmed_text,
                 )
-                structured_llm = self.llm.with_structured_output(ExtractionPayload)
+                structured_llm = self.llm.with_structured_output(
+                    ExtractionPayload, method="function_calling"
+                )
                 result: ExtractionPayload = structured_llm.invoke([
                     SystemMessage(content=EXTRACTOR_SYSTEM_PROMPT),
                     HumanMessage(content=user_msg),

@@ -94,7 +94,9 @@ class CriticAgent:
                     revision_count=revision_count,
                     max_revisions=max_rev,
                 )
-                structured_llm = self.llm.with_structured_output(Critique)
+                structured_llm = self.llm.with_structured_output(
+                    Critique, method="function_calling"
+                )
                 result = structured_llm.invoke([
                     SystemMessage(content=CRITIC_SYSTEM_PROMPT),
                     HumanMessage(content=user_msg),

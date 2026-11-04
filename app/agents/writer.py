@@ -219,7 +219,9 @@ class ReportWriterAgent:
         synthesis: Dict[str, Any],
         citation_checks: List[CitationCheck],
     ) -> ResearchReport:
-        structured_llm = llm.with_structured_output(ResearchReport)
+        structured_llm = llm.with_structured_output(
+            ResearchReport, method="function_calling"
+        )
         evidence_summary = "\n".join(
             f"[{e.paper_id}] Claim: {e.claim} | Quote: \"{e.supporting_passage}\" | Scope: {e.content_scope}"
             for e in evidence_records[:15]
