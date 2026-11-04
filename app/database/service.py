@@ -2,6 +2,7 @@
 
 import json
 import logging
+import socket
 from typing import Any, Dict, List, Optional
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, selectinload, sessionmaker
@@ -15,25 +16,37 @@ _engine = None
 _SessionFactory = None
 
 
+def _is_postgres_available(host: str = "localhost", port: int = 5432, timeout: float = 0.2) -> bool:
+    try:
+        with socket.create_connection((host, port), timeout=timeout):
+            return True
+    except OSError:
+        return False
+
+
 def get_db_engine():
     """Retrieve or initialize the SQLAlchemy database engine."""
     global _engine, _SessionFactory
     if _engine is None:
         settings = get_settings()
         db_url = settings.DATABASE_URL
-        # Default to SQLite for zero-configuration local runs if postgres unreachable
+
+        # Quick pre-check: if URL specifies postgres, check if port 5432 is reachable
+        if ("postgresql" in db_url or "psycopg" in db_url) and not _is_postgres_available():
+            db_url = "sqlite:///./research.db"
+
         connect_args = {}
         if "sqlite" in db_url:
             connect_args["check_same_thread"] = False
         elif "postgresql" in db_url or "psycopg" in db_url:
             connect_args["connect_timeout"] = 1
+
         try:
             _engine = create_engine(db_url, connect_args=connect_args, pool_pre_ping=True)
-            # Test engine connection
             with _engine.connect() as conn:
                 pass
         except Exception as e:
-            logger.warning(f"Database connection to {db_url} failed: {e}. Falling back to SQLite local db.")
+            logger.info(f"Using SQLite local db (PostgreSQL unavailable: {e}).")
             sqlite_url = "sqlite:///./research.db"
             _engine = create_engine(sqlite_url, connect_args={"check_same_thread": False})
 
