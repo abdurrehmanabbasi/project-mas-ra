@@ -10,6 +10,8 @@ from app.config import get_settings
 
 logger = logging.getLogger(__name__)
 
+_shared_memory_saver: Optional[MemorySaver] = None
+
 
 def get_checkpointer(
     force_memory: bool = False, conn_string: Optional[str] = None
@@ -23,6 +25,8 @@ def get_checkpointer(
     Returns:
         BaseCheckpointSaver (PostgresSaver or MemorySaver).
     """
+    global _shared_memory_saver
+
     if force_memory:
         return MemorySaver()
 
@@ -44,5 +48,7 @@ def get_checkpointer(
         logger.warning(
             f"Could not connect to PostgreSQL checkpointer ({e}). Falling back to in-memory checkpointer (MemorySaver)."
         )
-        return MemorySaver()
+        if _shared_memory_saver is None:
+            _shared_memory_saver = MemorySaver()
+        return _shared_memory_saver
 

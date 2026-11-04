@@ -86,7 +86,9 @@ class AnalystAgent:
                     analyses_text=analyses_text,
                     evidence_text=evidence_text,
                 )
-                structured_llm = self.llm.with_structured_output(ResearchSynthesis)
+                structured_llm = self.llm.with_structured_output(
+                    ResearchSynthesis, method="function_calling"
+                )
                 result = structured_llm.invoke([
                     SystemMessage(content=ANALYST_SYSTEM_PROMPT),
                     HumanMessage(content=user_msg),

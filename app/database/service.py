@@ -4,7 +4,7 @@ import json
 import logging
 from typing import Any, Dict, List, Optional
 from sqlalchemy import create_engine
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.orm import Session, selectinload, sessionmaker
 
 from app.config import get_settings
 from app.database.models import Base, ProjectModel, ReportModel, ResearchRunModel
@@ -78,7 +78,12 @@ class DatabaseService:
     def list_projects(cls) -> List[ProjectModel]:
         session = get_db_session()
         try:
-            return session.query(ProjectModel).order_by(ProjectModel.created_at.desc()).all()
+            return (
+                session.query(ProjectModel)
+                .options(selectinload(ProjectModel.runs))
+                .order_by(ProjectModel.created_at.desc())
+                .all()
+            )
         finally:
             session.close()
 
@@ -86,7 +91,28 @@ class DatabaseService:
     def get_project(cls, project_id: str) -> Optional[ProjectModel]:
         session = get_db_session()
         try:
-            return session.query(ProjectModel).filter(ProjectModel.id == project_id).first()
+            return (
+                session.query(ProjectModel)
+                .options(selectinload(ProjectModel.runs))
+                .filter(ProjectModel.id == project_id)
+                .first()
+            )
+        finally:
+            session.close()
+
+    @classmethod
+    def list_runs(cls) -> List[ResearchRunModel]:
+        session = get_db_session()
+        try:
+            return session.query(ResearchRunModel).order_by(ResearchRunModel.created_at.desc()).all()
+        finally:
+            session.close()
+
+    @classmethod
+    def list_reports(cls) -> List[ReportModel]:
+        session = get_db_session()
+        try:
+            return session.query(ReportModel).order_by(ReportModel.created_at.desc()).all()
         finally:
             session.close()
 
