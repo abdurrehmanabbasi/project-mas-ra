@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MAS-RA Interactive Architecture &amp; Teaching App</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="container">
+
+    <!-- Header -->
+    <header class="card">
+      <div class="header-top">
+        <div>
+          <div class="eyebrow">Interactive Classroom Demo | MAS-RA Architecture</div>
+          <h1>Autonomous Multi-Agent Research Assistant (MAS-RA)</h1>
+          <p class="subtitle">
+            Step through the LangGraph pipeline, inspect all 5 specialized agents, experiment with deduplication and citation grounding rules, and explore persistent checkpointing and REST benchmarks.
+          </p>
+        </div>
+        <div class="header-actions">
+          <span class="pill">LangGraph StateGraph</span>
+          <span class="pill">FastAPI + Streamlit</span>
+          <span class="pill pill-success">54/54 Tests Passing</span>
+          <button id="btn-theme-toggle" class="btn" type="button">Dark Mode</button>
+        </div>
+      </div>
+
+      <!-- Navigation Tabs -->
+      <nav class="nav-tabs" aria-label="Educational Modules">
+        <button class="tab-btn" type="button" data-tab="simulator" data-active="true">1. Live Pipeline Simulator</button>
+        <button class="tab-btn" type="button" data-tab="agents" data-active="false">2. Meet the 5 Agents</button>
+        <button class="tab-btn" type="button" data-tab="tools" data-active="false">3. Zero-Hallucination Tools Lab</button>
+        <button class="tab-btn" type="button" data-tab="persistence" data-active="false">4. State &amp; Persistent Checkpointing</button>
+        <button class="tab-btn" type="button" data-tab="eval" data-active="false">5. REST API, Benchmarks &amp; Quiz</button>
+      </nav>
+    </header>
+
+    <!-- ===================================================================== -->
+    <!-- TAB 1: LIVE PIPELINE SIMULATOR                                        -->
+    <!-- ===================================================================== -->
+    <section id="tab-simulator" class="tab-panel">
+
+      <div class="card">
+        <div class="controls-row">
+          <div class="controls-left">
+            <label class="topic-label">
+              <strong>Topic:</strong>
+              <select id="sim-topic">
+                <option value="se">Multi-Agent LLM Software Engineering</option>
+                <option value="health">Multi-Agent AI in Health Monitoring</option>
+              </select>
+            </label>
+            <label class="inline-check">
+              <input id="opt-critic-rev" type="checkbox" checked />
+              <span>Trigger Critic Revision Loop</span>
+            </label>
+            <label class="inline-check">
+              <input id="opt-hitl" type="checkbox" checked />
+              <span>Enable Human Review Gate</span>
+            </label>
+            <label class="inline-check">
+              <input id="opt-paywall" type="checkbox" />
+              <span>Simulate Paywalled PDF</span>
+            </label>
+          </div>
+          <div class="controls-right">
+            <button id="btn-step" class="btn btn-primary" type="button">Step Next</button>
+            <button id="btn-play" class="btn" type="button">Auto-Play</button>
+            <button id="btn-reset" class="btn" type="button">Reset</button>
+          </div>
+        </div>
+
+        <div class="telemetry-grid">
+          <div class="subcard">
+            <div class="stat-label">Current Node</div>
+            <div id="stat-node" class="stat-val mono text-primary">START</div>
+          </div>
+          <div class="subcard">
+            <div class="stat-label">Run Status</div>
+            <div id="stat-status" class="stat-val mono">queued</div>
+          </div>
+          <div class="subcard">
+            <div class="stat-label">Selected Papers</div>
+            <div id="stat-papers" class="stat-val mono">0</div>
+          </div>
+          <div class="subcard">
+            <div class="stat-label">Grounded Claims</div>
+            <div id="stat-evidence" class="stat-val mono">0</div>
+          </div>
+          <div class="subcard">
+            <div class="stat-label">Revision Cycle</div>
+            <div id="stat-revisions" class="stat-val mono">0 / 2</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="split-grid">
+
+        <!-- Visual StateGraph Map -->
+        <div class="card">
+          <div class="inspector-header">
+            <h2>LangGraph Cyclic StateGraph (Click any node to inspect)</h2>
+            <span class="mono text-muted" style="font-size:12px;">app/graph/workflow.py</span>
+          </div>
+
+          <div class="graph-flow">
+            <div class="flow-center">
+              <button class="sim-node narrow" type="button" data-node="planner">
+                <div class="sim-node-head">
+                  <span>1. planner</span>
+                  <span class="node-badge">idle</span>
+                </div>
+                <div class="sim-node-sub">PlannerAgent -&gt; 3 orthogonal queries</div>
+              </button>
+            </div>
+
+            <div class="flow-arrow">&#8595; Send() dynamic fan-out</div>
+
+            <div class="three-col">
+              <button class="sim-node" type="button" data-node="search_worker">
+                <div class="sim-node-head">
+                  <span>2a. search_worker</span>
+                  <span class="node-badge">idle</span>
+                </div>
+                <div class="sim-node-sub">Task 1 (arXiv + S2)</div>
+              </button>
+              <button class="sim-node" type="button" data-node="search_worker">
+                <div class="sim-node-head">
+                  <span>2b. search_worker</span>
+                  <span class="node-badge">idle</span>
+                </div>
+                <div class="sim-node-sub">Task 2 (arXiv + S2)</div>
+              </button>
+              <button class="sim-node" type="button" data-node="search_worker">
+                <div class="sim-node-head">
+                  <span>2c. search_worker</span>
+                  <span class="node-badge">idle</span>
+                </div>
+                <div class="sim-node-sub">Task 3 (arXiv + S2)</div>
+              </button>
+            </div>
+
+            <div class="flow-arrow">&#8595; merge_papers_reducer (fan-in)</div>
+
+            <div class="three-col">
+              <button class="sim-node" type="button" data-node="deduplicate_and_rank">
+                <div class="sim-node-head">
+                  <span>3. deduplicate_and_rank</span>
+                  <span class="node-badge">idle</span>
+                </div>
+                <div class="sim-node-sub">DOI + Jaccard + Top K</div>
+              </button>
+              <button class="sim-node" type="button" data-node="retrieve_content">
+                <div class="sim-node-head">
+                  <span>4. retrieve_content</span>
+                  <span class="node-badge">idle</span>
+                </div>
+                <div class="sim-node-sub">PDF / Abstract fallback</div>
+              </button>
+              <button class="sim-node" type="button" data-node="extract_evidence">
+                <div class="sim-node-head">
+                  <span>5. extract_evidence</span>
+                  <span class="node-badge">idle</span>
+                </div>
+                <div class="sim-node-sub">Verbatim empirical claims</div>
+              </button>
+            </div>
+
+            <div class="three-col">
+              <button class="sim-node" type="button" data-node="analyze_literature">
+                <div class="sim-node-head">
+                  <span>6. analyze_literature</span>
+                  <span class="node-badge">idle</span>
+                </div>
+                <div class="sim-node-sub">Themes &amp; Comparisons</div>
+              </button>
+              <button class="sim-node" type="button" data-node="critique">
+                <div class="sim-node-head">
+                  <span>7. critique</span>
+                  <span class="node-badge">idle</span>
+                </div>
+                <div class="sim-node-sub">Score &amp; Coverage Audit</div>
+              </button>
+              <button class="sim-node" type="button" data-node="prepare_revision">
+                <div class="sim-node-head">
+                  <span>7r. prepare_revision</span>
+                  <span class="node-badge">idle</span>
+                </div>
+                <div class="sim-node-sub">Loop back to workers</div>
+              </button>
+            </div>
+
+            <div class="three-col">
+              <button class="sim-node" type="button" data-node="verify_citations">
+                <div class="sim-node-head">
+                  <span>8. verify_citations</span>
+                  <span class="node-badge">idle</span>
+                </div>
+                <div class="sim-node-sub">DOI &amp; Claim checks</div>
+              </button>
+              <button class="sim-node" type="button" data-node="human_review">
+                <div class="sim-node-head">
+                  <span>9. human_review</span>
+                  <span class="node-badge">idle</span>
+                </div>
+                <div class="sim-node-sub">interrupt() HITL gate</div>
+              </button>
+              <button class="sim-node" type="button" data-node="synthesize_summary">
+                <div class="sim-node-head">
+                  <span>10. synthesize_summary</span>
+                  <span class="node-badge">idle</span>
+                </div>
+                <div class="sim-node-sub">Markdown &amp; PDF Report</div>
+              </button>
+            </div>
+          </div>
+
+          <div id="hitl-panel" class="hitl-panel hidden">
+            <div class="hitl-head">
+              <strong class="text-warning">CHECKPOINT PAUSED: HUMAN-IN-THE-LOOP REVIEW PACKAGE</strong>
+              <span class="mono text-muted">interrupt(review_package)</span>
+            </div>
+            <p style="margin:0;font-size:12px;">
+              Execution halted cleanly and persisted to <code>research_checkpoints.db</code>. Choose a reviewer command to resume the graph:
+            </p>
+            <div class="header-actions">
+              <button id="hitl-approve" class="btn btn-success" type="button">Command(resume: approve)</button>
+              <button id="hitl-revise" class="btn btn-warning" type="button">Command(resume: request_revision)</button>
+              <button id="hitl-reject" class="btn btn-error" type="button">Command(resume: reject)</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step Explanation & State Inspector -->
+        <div class="card inspector-box">
+          <div class="inspector-header">
+            <h2 id="insp-title">Inspector: Click Step Next or Select a Node</h2>
+            <span id="insp-file" class="mono text-primary" style="font-size:12px;">app/graph/nodes.py</span>
+          </div>
+
+          <div>
+            <strong style="font-size:12px;">How This Step Works:</strong>
+            <p id="insp-desc" class="text-muted" style="margin:4px 0 0;font-size:12px;">
+              Press "Step Next" above to step through the entire MAS-RA lifecycle one node at a time, or click any node in the graph to inspect its code, teaching notes, and live ResearchState mutations.
+            </p>
+          </div>
+
+          <div>
+            <strong style="font-size:12px;">Key Teaching Takeaway:</strong>
+            <div id="insp-lesson" class="lesson-box" style="margin-top:6px;">
+              Unlike single-prompt LLM wrappers, LangGraph models research as a resumable state machine with typed reducers and explicit loops.
+            </div>
+          </div>
+
+          <div class="field-stack">
+            <div class="inspector-header" style="border-bottom:none;padding-bottom:0;">
+              <strong>Live ResearchState Snapshot</strong>
+              <span class="mono text-muted">TypedDict</span>
+            </div>
+            <pre id="insp-json">{
+  "status": "queued",
+  "research_question": "How do multi-agent LLM frameworks coordinate software engineering benchmarks?",
+  "selected_papers": [],
+  "extracted_evidence": [],
+  "revision_count": 0
+}</pre>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ===================================================================== -->
+    <!-- TAB 2: MEET THE 5 AGENTS                                              -->
+    <!-- ===================================================================== -->
+    <section id="tab-agents" class="tab-panel hidden">
+      <div class="card section-gap">
+        <div>
+          <h2>Specialized Division of Labor (app/agents/)</h2>
+          <p class="subtitle" style="margin-top:4px;">
+            Each agent uses OpenAI structured outputs with <code>method="function_calling"</code> to avoid strict JSON schema rejections on loose dicts, plus a deterministic offline fallback for reliable offline testing.
+          </p>
+        </div>
+
+        <div id="agent-selector" class="five-col"></div>
+        <div id="agent-detail" class="subcard"></div>
+      </div>
+    </section>
+
+    <!-- ===================================================================== -->
+    <!-- TAB 3: ZERO-HALLUCINATION TOOLS LAB                                   -->
+    <!-- ===================================================================== -->
+    <section id="tab-tools" class="tab-panel hidden">
+      <div class="two-col">
+
+        <!-- PaperDeduplicator -->
+        <div class="card section-gap">
+          <div class="inspector-header">
+            <h2>1. PaperDeduplicator Live Tester</h2>
+            <span class="mono text-primary" style="font-size:12px;">app/tools/paper_dedup.py</span>
+          </div>
+          <p class="subtitle">
+            Edit Title, DOI, or Year between two records from arXiv and Semantic Scholar to test the 4-stage matching algorithm (DOI, Provider ID, Exact Title, Jaccard &gt; 0.85).
+          </p>
+
+          <div class="two-col">
+            <div class="subcard field-stack">
+              <strong class="text-primary">Record A (arXiv)</strong>
+              <input id="dd-t1" type="text" value="AgentBench: Evaluating LLMs as Agents" />
+              <input id="dd-d1" type="text" class="mono" value="https://doi.org/10.48550/arXiv.2308.03688" />
+              <input id="dd-y1" type="number" value="2023" />
+            </div>
+            <div class="subcard field-stack">
+              <strong class="text-accent">Record B (Semantic Scholar)</strong>
+              <input id="dd-t2" type="text" value="AgentBench: Evaluating LLMs as Agents." />
+              <input id="dd-d2" type="text" class="mono" value="doi:10.48550/ARXIV.2308.03688" />
+              <input id="dd-y2" type="number" value="2024" />
+            </div>
+          </div>
+
+          <div id="dd-result" class="subcard"></div>
+        </div>
+
+        <!-- CitationVerifier & PDF Scope -->
+        <div class="card section-gap">
+          <div class="inspector-header">
+            <h2>2. CitationVerifier DOI &amp; Grounding Lab</h2>
+            <span class="mono text-primary" style="font-size:12px;">app/tools/citation_verifier.py</span>
+          </div>
+          <div class="two-col">
+            <label class="field-stack">
+              <span class="text-muted">Test DOI Syntax</span>
+              <input id="cv-doi" type="text" class="mono" value="10.48550/arXiv.2308.03688" />
+            </label>
+            <label class="field-stack">
+              <span class="text-muted">Supporting Passage Excerpt</span>
+              <input id="cv-passage" type="text" value="In evaluation across 8 environments, agents achieved 24% higher pass rate." />
+            </label>
+          </div>
+          <div id="cv-result" class="subcard"></div>
+
+          <div class="inspector-header" style="margin-top:6px;">
+            <h2>3. PDF Retrieval Scope Cascade</h2>
+            <span class="mono text-primary" style="font-size:12px;">paper_retriever.py + pdf_parser.py</span>
+          </div>
+          <select id="pdf-scenario">
+            <option value="ok">Valid %PDF stream under 15 MB and under 15s timeout</option>
+            <option value="paywall">HTTP 202 / 403 Paywall or HTML challenge redirect</option>
+            <option value="timeout">Throttled server exceeds 15s wall-clock deadline</option>
+            <option value="scanned">Scanned image PDF yields &lt; 50 chars + no abstract</option>
+          </select>
+          <div id="pdf-result" class="subcard"></div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ===================================================================== -->
+    <!-- TAB 4: STATE & PERSISTENT CHECKPOINTING                               -->
+    <!-- ===================================================================== -->
+    <section id="tab-persistence" class="tab-panel hidden">
+      <div class="card section-gap">
+        <div class="inspector-header">
+          <div>
+            <h2>Dual Persistence &amp; Zero-Dependency Checkpointer</h2>
+            <p class="subtitle" style="margin-top:4px;">
+              Explore how MAS-RA routes storage automatically when PostgreSQL is offline or Windows Application Control blocks binary database DLLs.
+            </p>
+          </div>
+          <span class="mono text-primary" style="font-size:12px;">service.py + checkpointer.py</span>
+        </div>
+
+        <div class="subcard controls-left">
+          <label class="inline-check">
+            <input id="env-pg" type="checkbox" />
+            <span>PostgreSQL Listening on Port 5432</span>
+          </label>
+          <label class="inline-check">
+            <input id="env-testing" type="checkbox" />
+            <span>APP_ENV = "testing" (Pytest Mode)</span>
+          </label>
+          <label class="inline-check">
+            <input id="env-applocker" type="checkbox" checked />
+            <span>Windows App Control Blocks psycopg Binary DLL</span>
+          </label>
+        </div>
+
+        <div id="env-routing-output" class="two-col"></div>
+
+        <div class="section-gap" style="padding-top:8px;border-top:1px solid var(--border-subtle);">
+          <h3>How ResearchState Merges Updates Safely</h3>
+          <div class="three-col">
+            <div class="subcard">
+              <div class="mono text-primary" style="font-weight:700;">merge_papers_reducer</div>
+              <p class="text-muted" style="margin:6px 0 0;font-size:12px;">
+                Used on <code>search_results</code>. Parallel <code>search_worker</code> nodes emit candidate paper lists; this reducer deduplicates and merges them automatically.
+              </p>
+            </div>
+            <div class="subcard">
+              <div class="mono text-accent" style="font-weight:700;">operator.add + Skip Cache</div>
+              <p class="text-muted" style="margin:6px 0 0;font-size:12px;">
+                Used on <code>paper_contents</code>, <code>paper_analyses</code>, and <code>extracted_evidence</code>. Nodes check existing <code>paper_id</code>s so revision cycles skip redundant downloads and LLM calls.
+              </p>
+            </div>
+            <div class="subcard">
+              <div class="mono text-success" style="font-weight:700;">cp_storage / cp_blobs / cp_writes</div>
+              <p class="text-muted" style="margin:6px 0 0;font-size:12px;">
+                <code>SQLiteMemorySaver</code> persists LangGraph memory tables via Python stdlib <code>sqlite3</code> so interrupted HITL checkpoints survive restarts.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================================================================== -->
+    <!-- TAB 5: REST API, BENCHMARKS & QUIZ                                    -->
+    <!-- ===================================================================== -->
+    <section id="tab-eval" class="tab-panel hidden section-gap">
+      <div class="two-col">
+
+        <div class="card section-gap">
+          <div class="inspector-header">
+            <h2>Baseline vs MAS-RA Empirical Comparison</h2>
+            <span class="mono text-primary" style="font-size:12px;">app/evaluation/metrics.py</span>
+          </div>
+          <div class="chart-wrap">
+            <canvas id="evalChart" height="235"></canvas>
+          </div>
+          <div class="two-col" style="padding-top:8px;border-top:1px solid var(--border-subtle);">
+            <div class="subcard">
+              <div class="stat-label">Ablation: Full Multi-Agent</div>
+              <div class="mono" style="font-weight:700;">Quality: 0.85 | Support: 100%</div>
+            </div>
+            <div class="subcard">
+              <div class="stat-label">Verification Suite</div>
+              <div class="mono text-success" style="font-weight:700;">54/54 Pytest Passing</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card section-gap">
+          <div class="inspector-header">
+            <h2>FastAPI Backend Explorer (12 Endpoints)</h2>
+            <span class="mono text-primary" style="font-size:12px;">app/api/routes.py</span>
+          </div>
+          <div id="api-list" class="header-actions"></div>
+          <pre id="api-preview"></pre>
+        </div>
+
+      </div>
+
+      <div class="card section-gap">
+        <div class="inspector-header">
+          <h2>Student Knowledge Check: Test Your Architecture Understanding</h2>
+          <span id="quiz-score" class="mono text-primary" style="font-weight:700;">Score: 0 / 4</span>
+        </div>
+        <div id="quiz-container" class="two-col"></div>
+      </div>
+    </section>
+
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
+
