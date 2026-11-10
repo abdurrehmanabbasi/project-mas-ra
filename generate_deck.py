@@ -1,644 +1,658 @@
-"""Script to generate professional academic PowerPoint presentation for MAS-RA."""
+"""Generate concise, minimal Option A (Clean Light Academic) 10-slide PowerPoint deck for MAS-RA."""
 
 import os
 from pptx import Presentation
-from pptx.util import Inches, Pt
+from pptx.chart.data import CategoryChartData
 from pptx.dml.color import RGBColor
-from pptx.enum.text import PP_ALIGN
+from pptx.enum.chart import XL_CHART_TYPE, XL_LEGEND_POSITION
 from pptx.enum.shapes import MSO_SHAPE
+from pptx.enum.text import MSO_ANCHOR, PP_ALIGN
+from pptx.util import Inches, Pt
 
-def create_presentation():
+
+# Option A: Clean Light Academic Palette
+NAVY = RGBColor(15, 23, 42)        # #0F172A Deep Navy Ink & Hero Bg
+COBALT = RGBColor(29, 78, 216)     # #1D4ED8 Primary Accent
+SKY = RGBColor(56, 189, 248)       # #38BDF8 Hero Accent Highlight
+TEAL = RGBColor(13, 148, 136)      # #0D9488 Secondary Accent
+EMERALD = RGBColor(21, 128, 61)    # #15803D Success / Verified
+AMBER = RGBColor(217, 119, 6)      # #D97706 HITL / Caution
+CRIMSON = RGBColor(220, 38, 38)    # #DC2626 Problem / Failure
+
+CANVAS = RGBColor(248, 250, 252)   # #F8FAFC Page Canvas
+WHITE = RGBColor(255, 255, 255)    # #FFFFFF Card Surface
+SOFT_BLUE = RGBColor(239, 246, 255)# #EFF6FF Highlight Surface
+SOFT_SLATE = RGBColor(241, 245, 249)# #F1F5F9 Nested Surface
+BORDER = RGBColor(203, 213, 225)   # #CBD5E1 Card Border
+
+CHARCOAL = RGBColor(51, 65, 85)    # #334155 Body Text
+MUTED = RGBColor(100, 116, 139)    # #64748B Metadata / Footer
+FONT_MAIN = "Calibri"
+FONT_MONO = "Consolas"
+
+
+def set_bg(slide, color=CANVAS):
+    bg = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(0), Inches(0), Inches(13.333), Inches(7.5))
+    bg.fill.solid()
+    bg.fill.fore_color.rgb = color
+    bg.line.fill.background()
+    return bg
+
+
+def add_rect(slide, left, top, width, height, fill_color=WHITE, border_color=None, border_pt=1.0, rounded=True):
+    shape_type = MSO_SHAPE.ROUNDED_RECTANGLE if rounded else MSO_SHAPE.RECTANGLE
+    shp = slide.shapes.add_shape(shape_type, left, top, width, height)
+    if rounded:
+        try:
+            shp.adjustments[0] = 0.04
+        except Exception:
+            pass
+    shp.fill.solid()
+    shp.fill.fore_color.rgb = fill_color
+    if border_color is not None:
+        shp.line.color.rgb = border_color
+        shp.line.width = Pt(border_pt)
+    else:
+        shp.line.fill.background()
+    return shp
+
+
+def add_text_box(
+    slide,
+    left,
+    top,
+    width,
+    height,
+    text="",
+    font_size=14,
+    bold=False,
+    color=CHARCOAL,
+    font_name=FONT_MAIN,
+    align=PP_ALIGN.LEFT,
+    valign=MSO_ANCHOR.TOP,
+):
+    tb = slide.shapes.add_textbox(left, top, width, height)
+    tf = tb.text_frame
+    tf.word_wrap = True
+    tf.vertical_anchor = valign
+    tf.margin_left = tf.margin_right = tf.margin_top = tf.margin_bottom = 0
+    if text:
+        p = tf.paragraphs[0]
+        p.alignment = align
+        run = p.add_run()
+        run.text = text
+        run.font.name = font_name
+        run.font.size = Pt(font_size)
+        run.font.bold = bold
+        run.font.color.rgb = color
+    return tf
+
+
+def add_bullets(tf, items, font_size=14, color=CHARCOAL, space_after=12, prefix="- "):
+    for i, item in enumerate(items):
+        p = tf.paragraphs[0] if (i == 0 and len(tf.paragraphs[0].runs) == 0 and tf.paragraphs[0].text == "") else tf.add_paragraph()
+        p.space_after = Pt(space_after)
+        p.line_spacing = 1.15
+        r = p.add_run()
+        r.text = f"{prefix}{item}"
+        r.font.name = FONT_MAIN
+        r.font.size = Pt(font_size)
+        r.font.color.rgb = color
+
+
+def add_header_footer(slide, slide_num, category, title):
+    set_bg(slide, CANVAS)
+    add_rect(slide, Inches(0), Inches(0), Inches(13.333), Inches(0.08), fill_color=COBALT, rounded=False)
+
+    add_text_box(
+        slide, Inches(0.7), Inches(0.3), Inches(10.0), Inches(0.28),
+        text=category.upper(), font_size=11, bold=True, color=COBALT,
+    )
+    add_text_box(
+        slide, Inches(0.7), Inches(0.58), Inches(11.9), Inches(0.58),
+        text=title, font_size=26, bold=True, color=NAVY,
+    )
+    add_rect(slide, Inches(0.7), Inches(1.24), Inches(11.933), Inches(0.02), fill_color=BORDER, rounded=False)
+
+    # Footer
+    add_rect(slide, Inches(0.7), Inches(7.02), Inches(11.933), Inches(0.015), fill_color=BORDER, rounded=False)
+    add_text_box(
+        slide, Inches(0.7), Inches(7.1), Inches(9.5), Inches(0.28),
+        text="MAS-RA: Autonomous Multi-Agent Research Assistant",
+        font_size=10, color=MUTED,
+    )
+    add_text_box(
+        slide, Inches(11.0), Inches(7.1), Inches(1.633), Inches(0.28),
+        text=f"Slide {slide_num} / 10", font_size=10, bold=True, color=COBALT, align=PP_ALIGN.RIGHT,
+    )
+
+
+def add_notes(slide, text):
+    slide.notes_slide.notes_text_frame.text = text
+
+
+def add_badge_circle(slide, left, top, size, label, fill_color=COBALT, text_color=WHITE, font_size=14):
+    c = slide.shapes.add_shape(MSO_SHAPE.OVAL, left, top, size, size)
+    c.fill.solid()
+    c.fill.fore_color.rgb = fill_color
+    c.line.fill.background()
+    tf = c.text_frame
+    tf.word_wrap = False
+    tf.vertical_anchor = MSO_ANCHOR.MIDDLE
+    tf.margin_left = tf.margin_right = tf.margin_top = tf.margin_bottom = 0
+    p = tf.paragraphs[0]
+    p.alignment = PP_ALIGN.CENTER
+    r = p.add_run()
+    r.text = label
+    r.font.name = FONT_MAIN
+    r.font.size = Pt(font_size)
+    r.font.bold = True
+    r.font.color.rgb = text_color
+    return c
+
+
+def add_pill(slide, left, top, width, height, text, fill_color=SOFT_BLUE, border_color=COBALT, text_color=COBALT, font_size=11.5):
+    shp = add_rect(slide, left, top, width, height, fill_color=fill_color, border_color=border_color, border_pt=1.0)
+    tf = shp.text_frame
+    tf.word_wrap = True
+    tf.vertical_anchor = MSO_ANCHOR.MIDDLE
+    tf.margin_left = tf.margin_right = Inches(0.06)
+    tf.margin_top = tf.margin_bottom = 0
+    p = tf.paragraphs[0]
+    p.alignment = PP_ALIGN.CENTER
+    r = p.add_run()
+    r.text = text
+    r.font.name = FONT_MONO
+    r.font.size = Pt(font_size)
+    r.font.bold = True
+    r.font.color.rgb = text_color
+    return shp
+
+
+def build_deck():
     prs = Presentation()
-    # 16:9 widescreen layout
     prs.slide_width = Inches(13.333)
     prs.slide_height = Inches(7.5)
-
-    # Color definitions
-    COLOR_BG = RGBColor(248, 250, 252)        # #F8FAFC Slate 50
-    COLOR_PRIMARY = RGBColor(15, 23, 42)       # #0F172A Slate 900
-    COLOR_SECONDARY = RGBColor(37, 99, 235)    # #2563EB Blue 600
-    COLOR_CARD_BG = RGBColor(255, 255, 255)    # Pure White
-    COLOR_CARD_BORDER = RGBColor(226, 232, 240)# #E2E8F0 Slate 200
-    COLOR_MUTED = RGBColor(71, 85, 105)        # #475569 Slate 600
-    COLOR_ACCENT = RGBColor(13, 148, 136)      # #0D9488 Teal 600
-    COLOR_DARK_HEADER = RGBColor(30, 41, 59)   # #1E293B
-
-    blank_layout = prs.slide_layouts[6]
-
-    def set_slide_background(slide):
-        bg = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(0), Inches(0), prs.slide_width, prs.slide_height)
-        bg.fill.solid()
-        bg.fill.fore_color.rgb = COLOR_BG
-        bg.line.fill.background()
-        return bg
-
-    def add_header(slide, title_text, category_text="MAS-RA: Autonomous Multi-Agent Research Assistant"):
-        # Header category tag
-        tag_box = slide.shapes.add_textbox(Inches(0.8), Inches(0.4), Inches(11.7), Inches(0.4))
-        tf_tag = tag_box.text_frame
-        tf_tag.word_wrap = True
-        tf_tag.margin_left = tf_tag.margin_top = tf_tag.margin_right = tf_tag.margin_bottom = 0
-        p_tag = tf_tag.paragraphs[0]
-        p_tag.text = category_text.upper()
-        p_tag.font.name = "Calibri"
-        p_tag.font.size = Pt(11)
-        p_tag.font.bold = True
-        p_tag.font.color.rgb = COLOR_SECONDARY
-
-        # Title
-        title_box = slide.shapes.add_textbox(Inches(0.8), Inches(0.75), Inches(11.7), Inches(0.8))
-        tf_title = title_box.text_frame
-        tf_title.word_wrap = True
-        tf_title.margin_left = tf_title.margin_top = tf_title.margin_right = tf_title.margin_bottom = 0
-        p_title = tf_title.paragraphs[0]
-        p_title.text = title_text
-        p_title.font.name = "Calibri"
-        p_title.font.size = Pt(26)
-        p_title.font.bold = True
-        p_title.font.color.rgb = COLOR_PRIMARY
-
-    def add_speaker_note(slide, note_text):
-        notes_slide = slide.notes_slide
-        tf = notes_slide.notes_text_frame
-        tf.text = note_text
-
-    def add_card(slide, left, top, width, height, title="", border_color=COLOR_CARD_BORDER, bg_color=COLOR_CARD_BG):
-        card = slide.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, left, top, width, height)
-        card.fill.solid()
-        card.fill.fore_color.rgb = bg_color
-        card.line.color.rgb = border_color
-        card.line.width = Pt(1.5)
-
-        if title:
-            tb = slide.shapes.add_textbox(left + Inches(0.3), top + Inches(0.25), width - Inches(0.6), Inches(0.5))
-            tf = tb.text_frame
-            tf.word_wrap = True
-            tf.margin_left = tf.margin_top = tf.margin_right = tf.margin_bottom = 0
-            p = tf.paragraphs[0]
-            p.text = title
-            p.font.name = "Calibri"
-            p.font.size = Pt(18)
-            p.font.bold = True
-            p.font.color.rgb = COLOR_DARK_HEADER
-        return card
+    blank = prs.slide_layouts[6]
 
     # =========================================================================
-    # SLIDE 1: Transition: From Foundational Theory to Systems Engineering
+    # SLIDE 1: Minimal Hero Title Slide
     # =========================================================================
-    s1 = prs.slides.add_slide(blank_layout)
-    set_slide_background(s1)
-    add_header(s1, "Transition: From Foundational Theory to Systems Engineering")
+    s1 = prs.slides.add_slide(blank)
+    set_bg(s1, NAVY)
 
-    # Quote Banner Card
-    add_card(s1, Inches(0.8), Inches(1.7), Inches(11.73), Inches(1.8), bg_color=RGBColor(241, 245, 249), border_color=COLOR_SECONDARY)
-    q_box = s1.shapes.add_textbox(Inches(1.1), Inches(1.9), Inches(11.13), Inches(1.4))
-    q_tf = q_box.text_frame
-    q_tf.word_wrap = True
-    p1 = q_tf.paragraphs[0]
-    p1.text = "\"What I cannot create, I do not understand.\" (Richard Feynman)"
-    p1.font.size = Pt(17)
-    p1.font.bold = True
-    p1.font.color.rgb = COLOR_PRIMARY
+    add_rect(s1, Inches(0), Inches(0), Inches(0.28), Inches(7.5), fill_color=COBALT, rounded=False)
+    add_rect(s1, Inches(0.28), Inches(0), Inches(0.08), Inches(7.5), fill_color=TEAL, rounded=False)
 
-    p2 = q_tf.add_paragraph()
-    p2.text = "\"The most effective way to truly master modern AI architectures is not by calling static endpoints, but by building autonomous systems from first principles.\" (Andrej Karpathy)"
-    p2.font.size = Pt(15)
-    p2.font.color.rgb = COLOR_MUTED
-    p2.space_before = Pt(8)
+    add_text_box(
+        s1, Inches(0.95), Inches(1.45), Inches(6.0), Inches(0.34),
+        text="CAPSTONE PRESENTATION", font_size=12, bold=True, color=SKY,
+    )
+    add_text_box(
+        s1, Inches(0.95), Inches(1.95), Inches(11.3), Inches(1.75),
+        text="MAS-RA: Autonomous Multi-Agent\nLiterature Review Assistant",
+        font_size=42, bold=True, color=WHITE,
+    )
+    add_text_box(
+        s1, Inches(0.95), Inches(3.85), Inches(10.5), Inches(0.55),
+        text="Evidence-Grounded Scientific Synthesis via LangGraph & Multi-Agent Verification",
+        font_size=18, color=RGBColor(203, 213, 225),
+    )
 
-    # 2 Comparison Columns
-    add_card(s1, Inches(0.8), Inches(3.7), Inches(5.7), Inches(3.2), title="Foundational Modules Covered")
-    c1_box = s1.shapes.add_textbox(Inches(1.1), Inches(4.3), Inches(5.1), Inches(2.4))
-    c1_tf = c1_box.text_frame
-    c1_tf.word_wrap = True
-    bullets1 = [
-        "Theoretical foundations of Transformer architectures and self-attention.",
-        "Single-turn prompt engineering and standard inference mechanisms.",
-        "Mathematical boundaries of autoregressive token prediction.",
-        "Conceptual overview of autonomous agent patterns and tools."
+    pills = [
+        ("LangGraph", Inches(1.55)),
+        ("GPT-4o-mini", Inches(1.6)),
+        ("arXiv + S2", Inches(1.55)),
+        ("FastAPI", Inches(1.35)),
+        ("Streamlit", Inches(1.45)),
+        ("SQLite / Postgres", Inches(2.05)),
     ]
-    for idx, b in enumerate(bullets1):
-        p = c1_tf.paragraphs[0] if idx == 0 else c1_tf.add_paragraph()
-        p.text = "- " + b
-        p.font.size = Pt(14)
-        p.font.color.rgb = COLOR_MUTED
-        p.space_after = Pt(8)
+    px = Inches(0.95)
+    for label, pw in pills:
+        add_pill(
+            s1, px, Inches(4.85), pw, Inches(0.44), label,
+            fill_color=RGBColor(30, 41, 59), border_color=COBALT, text_color=WHITE, font_size=11.5,
+        )
+        px += pw + Inches(0.16)
 
-    add_card(s1, Inches(6.83), Inches(3.7), Inches(5.7), Inches(3.2), title="Systems Engineering Implementation")
-    c2_box = s1.shapes.add_textbox(Inches(7.13), Inches(4.3), Inches(5.1), Inches(2.4))
-    c2_tf = c2_box.text_frame
-    c2_tf.word_wrap = True
-    bullets2 = [
-        "Engineering stateful cyclic execution graphs via LangGraph.",
-        "Heterogeneous multi-source literature ingestion (arXiv and Semantic Scholar).",
-        "Deterministic zero-hallucination empirical evidence extraction.",
-        "Automated critique loops and Human-in-the-Loop review gates."
+    add_rect(s1, Inches(0.95), Inches(6.1), Inches(11.4), Inches(0.02), fill_color=RGBColor(51, 65, 85), rounded=False)
+    add_text_box(
+        s1, Inches(0.95), Inches(6.28), Inches(6.5), Inches(0.45),
+        text="Problem  ->  Architecture  ->  Verification  ->  Evaluation",
+        font_size=13, color=RGBColor(148, 163, 184),
+    )
+    add_text_box(
+        s1, Inches(8.6), Inches(6.28), Inches(3.75), Inches(0.45),
+        text="54 / 54 Tests Passing", font_size=13, bold=True, color=RGBColor(74, 222, 128), align=PP_ALIGN.RIGHT,
+    )
+    add_notes(
+        s1,
+        "Good morning everyone. Today I present MAS-RA, an Autonomous Multi-Agent Research Assistant. "
+        "It replaces unreliable single-prompt summaries with a cyclic LangGraph pipeline that discovers real papers, grounds every claim in verbatim quotes, checks citations, and supports human approval."
+    )
+
+    # =========================================================================
+    # SLIDE 2: Problem Statement (Concise Trio)
+    # =========================================================================
+    s2 = prs.slides.add_slide(blank)
+    add_header_footer(s2, 2, "Problem Statement", "Why Standalone LLMs Fail Research")
+
+    # Compact Stat Callout Strip
+    add_rect(s2, Inches(0.7), Inches(1.58), Inches(11.933), Inches(0.68), fill_color=SOFT_BLUE, border_color=COBALT, border_pt=1.0)
+    add_text_box(
+        s2, Inches(0.95), Inches(1.68), Inches(11.4), Inches(0.48),
+        text="5M+ Annual Papers   |   Manual Review: 2 to 4 Weeks   |   Naive LLMs: Hallucinations",
+        font_size=16, bold=True, color=NAVY, align=PP_ALIGN.CENTER, valign=MSO_ANCHOR.MIDDLE,
+    )
+
+    pillars = [
+        ("1", "Fabricated Citations", ["Invented paper titles", "Fake or invalid DOIs", "Zero live API checks"]),
+        ("2", "Shallow Coverage", ["Abstract-only guessing", "Skips full PDF methods", "Duplicate paper noise"]),
+        ("3", "Zero Provenance", ["No verbatim quotes", "Blind research gaps", "No human checkpoint"]),
     ]
-    for idx, b in enumerate(bullets2):
-        p = c2_tf.paragraphs[0] if idx == 0 else c2_tf.add_paragraph()
-        p.text = "- " + b
-        p.font.size = Pt(14)
-        p.font.color.rgb = COLOR_MUTED
-        p.space_after = Pt(8)
+    cw = Inches(3.82)
+    for idx, (num, head, bullets) in enumerate(pillars):
+        cx = Inches(0.7) + idx * Inches(4.056)
+        add_rect(s2, cx, Inches(2.58), cw, Inches(3.95), fill_color=WHITE, border_color=BORDER, border_pt=1.2)
+        add_rect(s2, cx, Inches(2.58), cw, Inches(0.08), fill_color=CRIMSON, rounded=False)
+        add_badge_circle(s2, cx + Inches(0.24), Inches(2.92), Inches(0.48), num, fill_color=CRIMSON, font_size=16)
+        add_text_box(s2, cx + Inches(0.86), Inches(2.98), Inches(2.75), Inches(0.4), text=head, font_size=17, bold=True, color=NAVY)
+        tf = add_text_box(s2, cx + Inches(0.28), Inches(3.75), cw - Inches(0.56), Inches(2.5))
+        add_bullets(tf, bullets, font_size=15, space_after=18)
 
-    add_speaker_note(s1, "To transition from our theoretical review of transformer architectures and foundation models, we look to the guiding principle popularized by Andrej Karpathy and Richard Feynman: what we cannot create, we do not understand. Foundational prompting teaches model interaction, but genuine systems understanding requires engineering autonomous pipelines from first principles. In this section, we present MAS-RA, a production-grade multi-agent research assistant designed to execute verifiable, autonomous scientific literature reviews.")
+    add_notes(
+        s2,
+        "Over five million papers are published every year, turning manual literature review into a weeks-long bottleneck. "
+        "Meanwhile, naive single-prompt LLMs fail academic rigor in three ways: they fabricate citations and DOIs, guess superficially without reading full PDFs, and offer no verbatim proof, self-correction, or human checkpoint."
+    )
 
     # =========================================================================
-    # SLIDE 2: Problem Statement: Cognitive Load and Hallucination
+    # SLIDE 3: Motivation & Objectives (Clean Flow + 2x2 Minimal Grid)
     # =========================================================================
-    s2 = prs.slides.add_slide(blank_layout)
-    set_slide_background(s2)
-    add_header(s2, "Problem Statement: Cognitive Load and Hallucination in Scientific Review")
+    s3 = prs.slides.add_slide(blank)
+    add_header_footer(s3, 3, "Motivation & Goals", "From Weeks of Reading to Audited Prototypes")
 
-    add_card(s2, Inches(0.8), Inches(1.8), Inches(5.7), Inches(5.1), title="Cognitive Load in Modern Science")
-    s2_c1 = s2.shapes.add_textbox(Inches(1.1), Inches(2.5), Inches(5.1), Inches(4.2))
-    s2_tf1 = s2_c1.text_frame
-    s2_tf1.word_wrap = True
-    p_pts1 = [
-        "Over five million scientific papers published annually across open-access repositories and peer-reviewed journals.",
-        "Manual discovery across arXiv and Semantic Scholar creates unsustainable friction for researchers.",
-        "Comprehensive literature review requires between two and four weeks of continuous reading per study.",
-        "Comparative cross-paper analysis is vulnerable to human cognitive bias and incomplete methodology indexing."
+    stages = [
+        ("Weeks of Reading", SOFT_SLATE, BORDER, CHARCOAL),
+        ("MAS-RA Pipeline", SOFT_BLUE, COBALT, NAVY),
+        ("Verified Synthesis", RGBColor(240, 253, 250), TEAL, NAVY),
+        ("Faster Prototypes", RGBColor(240, 253, 244), EMERALD, NAVY),
     ]
-    for idx, b in enumerate(p_pts1):
-        p = s2_tf1.paragraphs[0] if idx == 0 else s2_tf1.add_paragraph()
-        p.text = "- " + b
-        p.font.size = Pt(14)
-        p.font.color.rgb = COLOR_MUTED
-        p.space_after = Pt(12)
+    sw = Inches(2.75)
+    for idx, (st_title, bg_c, bd_c, tx_c) in enumerate(stages):
+        sx = Inches(0.7) + idx * Inches(3.06)
+        add_rect(s3, sx, Inches(1.58), sw, Inches(0.88), fill_color=bg_c, border_color=bd_c, border_pt=1.5)
+        add_text_box(s3, sx + Inches(0.14), Inches(1.66), sw - Inches(0.28), Inches(0.72), text=st_title, font_size=15, bold=True, color=tx_c, align=PP_ALIGN.CENTER, valign=MSO_ANCHOR.MIDDLE)
+        if idx < 3:
+            add_text_box(s3, sx + sw + Inches(0.02), Inches(1.8), Inches(0.28), Inches(0.4), text="->", font_size=18, bold=True, color=COBALT, align=PP_ALIGN.CENTER)
 
-    add_card(s2, Inches(6.83), Inches(1.8), Inches(5.7), Inches(5.1), title="Limitations of Standalone LLMs")
-    s2_c2 = s2.shapes.add_textbox(Inches(7.13), Inches(2.5), Inches(5.1), Inches(4.2))
-    s2_tf2 = s2_c2.text_frame
-    s2_tf2.word_wrap = True
-    p_pts2 = [
-        "Hallucinated Scholarly Records: Models invent plausible-sounding papers, non-existent authors, and fabricated DOIs.",
-        "Superficial Context: Single-turn prompts summarize only abstracts, ignoring experimental setups, ablation studies, and limitations.",
-        "Absence of Provenance: Assertions lack traceable linkage to verbatim sentences in the source manuscripts.",
-        "Lack of Self-Refinement: Single-turn inference does not audit thematic completeness or detect unaddressed research gaps."
+    goals = [
+        ("Real Repository Discovery", TEAL, ["Live arXiv + Semantic Scholar APIs", "4-stage DOI & title deduplication"]),
+        ("Zero-Hallucination Core", COBALT, ["Exact verbatim source quotes", "Explicit full_text / abstract scope"]),
+        ("Bounded Self-Refinement", AMBER, ["Critic coverage score (0.0 to 1.0)", "Max 2 automatic revision loops"]),
+        ("Human Agency & Persistence", EMERALD, ["interrupt() human review gate", "Restart-safe SQLite checkpoints"]),
     ]
-    for idx, b in enumerate(p_pts2):
-        p = s2_tf2.paragraphs[0] if idx == 0 else s2_tf2.add_paragraph()
-        p.text = "- " + b
-        p.font.size = Pt(14)
-        p.font.color.rgb = COLOR_MUTED
-        p.space_after = Pt(12)
+    gw = Inches(5.82)
+    gh = Inches(1.85)
+    for idx, (g_title, acc_c, g_pts) in enumerate(goals):
+        col = idx % 2
+        row = idx // 2
+        gx = Inches(0.7) + col * (gw + Inches(0.29))
+        gy = Inches(2.78) + row * (gh + Inches(0.24))
+        add_rect(s3, gx, gy, gw, gh, fill_color=WHITE, border_color=BORDER, border_pt=1.2)
+        add_rect(s3, gx, gy, Inches(0.11), gh, fill_color=acc_c, rounded=False)
+        add_text_box(s3, gx + Inches(0.32), gy + Inches(0.22), gw - Inches(0.5), Inches(0.38), text=g_title, font_size=16.5, bold=True, color=NAVY)
+        tf = add_text_box(s3, gx + Inches(0.32), gy + Inches(0.74), gw - Inches(0.5), Inches(0.95))
+        add_bullets(tf, g_pts, font_size=14, space_after=10)
 
-    add_speaker_note(s2, "The problem space addresses two key bottlenecks. First, the exponential growth of scientific literature creates unsustainable cognitive load for researchers. Second, standard Large Language Models cannot resolve this task reliably on their own. When prompted for literature reviews, standalone LLMs hallucinate non-existent DOIs, rely superficially on abstracts without inspecting methodology sections, and provide ungrounded claims with zero provenance. In rigorous scientific research, an unverified citation compromises the validity of the work.")
+    add_notes(
+        s3,
+        "Our goal is to compress weeks of domain exploration into minutes while keeping scientific integrity intact. "
+        "We enforce four design pillars: real API discovery with deduplication, verbatim quote grounding, bounded self-refinement via a critic loop, and persistent human-in-the-loop checkpoints."
+    )
 
     # =========================================================================
-    # SLIDE 3: Motivation: Accelerating Prototypes and Production Engineering
+    # SLIDE 4: System Architecture (Pure Visual StateGraph)
     # =========================================================================
-    s3 = prs.slides.add_slide(blank_layout)
-    set_slide_background(s3)
-    add_header(s3, "Motivation: Accelerating Prototypes and Production Engineering")
+    s4 = prs.slides.add_slide(blank)
+    add_header_footer(s4, 4, "System Architecture", "LangGraph Cyclic StateGraph")
 
-    add_card(s3, Inches(0.8), Inches(1.8), Inches(3.7), Inches(5.1), title="Research-to-Production")
-    s3_c1 = s3.shapes.add_textbox(Inches(1.05), Inches(2.5), Inches(3.2), Inches(4.2))
-    s3_tf1 = s3_c1.text_frame
-    s3_tf1.word_wrap = True
-    pts3_1 = [
-        "Every enterprise engineering project begins with domain exploration.",
-        "Engineers must identify established baselines, existing libraries, and benchmark metrics before implementation.",
-        "Bridging literature directly to prototype specifications reduces false starts."
+    def draw_node(x, y, w, h, title, sub, fill=WHITE, border=COBALT, title_color=NAVY):
+        add_rect(s4, x, y, w, h, fill_color=fill, border_color=border, border_pt=1.6)
+        add_text_box(s4, x + Inches(0.08), y + Inches(0.1), w - Inches(0.16), Inches(0.32), text=title, font_size=12, bold=True, color=title_color, align=PP_ALIGN.CENTER)
+        add_text_box(s4, x + Inches(0.08), y + Inches(0.44), w - Inches(0.16), h - Inches(0.5), text=sub, font_size=10.5, color=CHARCOAL, align=PP_ALIGN.CENTER)
+
+    y1 = Inches(1.68)
+    nh = Inches(0.92)
+    draw_node(Inches(0.7), y1, Inches(1.05), nh, "START", "Query", fill=SOFT_SLATE, border=MUTED)
+    add_text_box(s4, Inches(1.77), y1 + Inches(0.3), Inches(0.28), Inches(0.3), text="->", font_size=14, bold=True, color=COBALT, align=PP_ALIGN.CENTER)
+    draw_node(Inches(2.07), y1, Inches(1.95), nh, "1. planner", "3-5 search tasks", fill=SOFT_BLUE, border=COBALT)
+    add_text_box(s4, Inches(4.04), y1 + Inches(0.3), Inches(0.4), Inches(0.3), text="Send", font_size=10, bold=True, color=COBALT, align=PP_ALIGN.CENTER)
+    draw_node(Inches(4.46), y1, Inches(2.25), nh, "2. search_worker", "Parallel arXiv & S2", fill=SOFT_BLUE, border=COBALT)
+    add_text_box(s4, Inches(6.73), y1 + Inches(0.3), Inches(0.28), Inches(0.3), text="->", font_size=14, bold=True, color=COBALT, align=PP_ALIGN.CENTER)
+    draw_node(Inches(7.03), y1, Inches(2.55), nh, "3. deduplicate_and_rank", "DOI + Jaccard", fill=WHITE, border=TEAL)
+    add_text_box(s4, Inches(9.6), y1 + Inches(0.3), Inches(0.28), Inches(0.3), text="->", font_size=14, bold=True, color=TEAL, align=PP_ALIGN.CENTER)
+    draw_node(Inches(9.9), y1, Inches(2.73), nh, "4. retrieve_content", "Skip cached PDFs", fill=WHITE, border=TEAL)
+
+    add_text_box(s4, Inches(11.05), Inches(2.7), Inches(0.45), Inches(0.32), text="v", font_size=16, bold=True, color=TEAL, align=PP_ALIGN.CENTER)
+
+    y2 = Inches(3.15)
+    draw_node(Inches(9.9), y2, Inches(2.73), nh, "5. extract_evidence", "Verbatim claims", fill=SOFT_BLUE, border=COBALT)
+    add_text_box(s4, Inches(9.6), y2 + Inches(0.3), Inches(0.28), Inches(0.3), text="<-", font_size=14, bold=True, color=COBALT, align=PP_ALIGN.CENTER)
+    draw_node(Inches(7.03), y2, Inches(2.55), nh, "6. analyze_literature", "Themes & matrix", fill=SOFT_BLUE, border=COBALT)
+    add_text_box(s4, Inches(6.73), y2 + Inches(0.3), Inches(0.28), Inches(0.3), text="<-", font_size=14, bold=True, color=COBALT, align=PP_ALIGN.CENTER)
+    draw_node(Inches(4.46), y2, Inches(2.25), nh, "7. critique", "Coverage score", fill=RGBColor(255, 251, 235), border=AMBER)
+
+    draw_node(Inches(0.7), y2, Inches(3.28), nh, "7r. prepare_revision", "Loop <= 2 cycles", fill=RGBColor(255, 251, 235), border=AMBER, title_color=AMBER)
+    add_text_box(s4, Inches(4.0), y2 + Inches(0.3), Inches(0.44), Inches(0.3), text="<-", font_size=14, bold=True, color=AMBER, align=PP_ALIGN.CENTER)
+    add_text_box(s4, Inches(4.46), Inches(2.68), Inches(2.25), Inches(0.36), text="^ revision fan-out ^", font_size=10.5, bold=True, color=AMBER, align=PP_ALIGN.CENTER)
+
+    add_text_box(s4, Inches(5.36), Inches(4.15), Inches(0.45), Inches(0.32), text="v", font_size=16, bold=True, color=EMERALD, align=PP_ALIGN.CENTER)
+
+    y3 = Inches(4.56)
+    draw_node(Inches(0.7), y3, Inches(2.6), nh, "8. verify_citations", "DOI & grounding", fill=RGBColor(240, 253, 244), border=EMERALD)
+    add_text_box(s4, Inches(3.32), y3 + Inches(0.3), Inches(0.28), Inches(0.3), text="->", font_size=14, bold=True, color=EMERALD, align=PP_ALIGN.CENTER)
+    draw_node(Inches(3.62), y3, Inches(2.8), nh, "9. human_review", "interrupt() Gate", fill=RGBColor(255, 251, 235), border=AMBER)
+    add_text_box(s4, Inches(6.44), y3 + Inches(0.3), Inches(0.28), Inches(0.3), text="->", font_size=14, bold=True, color=EMERALD, align=PP_ALIGN.CENTER)
+    draw_node(Inches(6.74), y3, Inches(2.85), nh, "10. synthesize_summary", "Markdown + PDF", fill=RGBColor(240, 253, 244), border=EMERALD)
+    add_text_box(s4, Inches(9.61), y3 + Inches(0.3), Inches(0.28), Inches(0.3), text="->", font_size=14, bold=True, color=EMERALD, align=PP_ALIGN.CENTER)
+    draw_node(Inches(9.91), y3, Inches(2.72), nh, "END / Rejected", "Saved to SQLite", fill=SOFT_SLATE, border=NAVY)
+
+    # Concise State Reducer Strip
+    add_rect(s4, Inches(0.7), Inches(5.9), Inches(11.933), Inches(0.78), fill_color=WHITE, border_color=COBALT, border_pt=1.2)
+    add_text_box(
+        s4, Inches(0.9), Inches(6.0), Inches(11.5), Inches(0.58),
+        text="ResearchState:  merge_papers_reducer (parallel fan-in)   |   operator.add + paper_id skip cache (zero duplicate work)",
+        font_size=13.5, bold=True, color=NAVY, align=PP_ALIGN.CENTER, valign=MSO_ANCHOR.MIDDLE,
+    )
+    add_notes(
+        s4,
+        "Here is our complete LangGraph workflow in app/graph/workflow.py. "
+        "It connects planning, parallel Send() search workers, deduplication, PDF parsing, verbatim extraction, analysis, bounded critique revision loops, citation verification, human interrupt review, and report generation over shared ResearchState reducers."
+    )
+
+    # =========================================================================
+    # SLIDE 5: Upstream Pipeline (Minimal 4-Step Funnel)
+    # =========================================================================
+    s5 = prs.slides.add_slide(blank)
+    add_header_footer(s5, 5, "Upstream Pipeline", "Discovery, Deduplication & Ingestion")
+
+    funnel = [
+        ("1", "PlannerAgent", COBALT, ["function_calling plan", "3 to 5 search tasks", "Offline keyword fallback"]),
+        ("2", "Search Workers", TEAL, ["Parallel Send() fan-out", "arXiv + Semantic Scholar", "HTTP 429 retry backoff"]),
+        ("3", "Deduplicator", COBALT, ["Normalized DOI match", "Jaccard title > 0.85", "Year + citation ranking"]),
+        ("4", "PDF Retriever", EMERALD, ["15 MB / 15s timeout", "%PDF header check", "Abstract scope fallback"]),
     ]
-    for idx, b in enumerate(pts3_1):
-        p = s3_tf1.paragraphs[0] if idx == 0 else s3_tf1.add_paragraph()
-        p.text = "- " + b
-        p.font.size = Pt(13)
-        p.font.color.rgb = COLOR_MUTED
-        p.space_after = Pt(10)
+    fw = Inches(2.78)
+    for idx, (num, name, col_c, pts) in enumerate(funnel):
+        fx = Inches(0.7) + idx * Inches(3.05)
+        add_rect(s5, fx, Inches(1.75), fw, Inches(4.8), fill_color=WHITE, border_color=BORDER, border_pt=1.2)
+        add_rect(s5, fx, Inches(1.75), fw, Inches(0.9), fill_color=col_c, rounded=False)
+        add_badge_circle(s5, fx + Inches(0.18), Inches(1.98), Inches(0.44), num, fill_color=WHITE, text_color=col_c, font_size=15)
+        add_text_box(s5, fx + Inches(0.72), Inches(2.03), fw - Inches(0.84), Inches(0.36), text=name, font_size=16, bold=True, color=WHITE)
 
-    add_card(s3, Inches(4.81), Inches(1.8), Inches(3.7), Inches(5.1), title="Compression of Iteration Time")
-    s3_c2 = s3.shapes.add_textbox(Inches(5.06), Inches(2.5), Inches(3.2), Inches(4.2))
-    s3_tf2 = s3_c2.text_frame
-    s3_tf2.word_wrap = True
-    pts3_2 = [
-        "Compresses multi-week manual reconnaissance into 45 to 90 seconds of autonomous execution.",
-        "Parallel search dispatch retrieves candidates across repositories simultaneously.",
-        "Enables continuous literature updates as fresh pre-prints publish on arXiv."
+        tf = add_text_box(s5, fx + Inches(0.22), Inches(3.05), fw - Inches(0.44), Inches(3.2))
+        add_bullets(tf, pts, font_size=14, space_after=22)
+
+        if idx < 3:
+            add_text_box(s5, fx + fw + Inches(0.02), Inches(3.9), Inches(0.25), Inches(0.4), text=">", font_size=20, bold=True, color=COBALT, align=PP_ALIGN.CENTER)
+
+    add_notes(
+        s5,
+        "The upstream discovery pipeline runs in four steps. PlannerAgent decomposes the inquiry into 3 to 5 orthogonal search queries. Parallel workers query arXiv and Semantic Scholar with rate-limit backoff. "
+        "PaperDeduplicator unifies duplicates via DOI matching and Jaccard title similarity. Finally, PaperRetriever downloads open PDFs under a 15 megabyte and 15 second deadline, cleanly degrading to abstract_only for paywalled manuscripts."
+    )
+
+    # =========================================================================
+    # SLIDE 6: Zero-Hallucination Core (Minimal JSON + 3 Gates)
+    # =========================================================================
+    s6 = prs.slides.add_slide(blank)
+    add_header_footer(s6, 6, "Zero-Hallucination Core", "Verbatim Evidence, Critique & Verification")
+
+    # Left: Compact Evidence Card
+    add_rect(s6, Inches(0.7), Inches(1.68), Inches(5.75), Inches(4.95), fill_color=NAVY, border_color=COBALT, border_pt=1.5)
+    add_text_box(
+        s6, Inches(0.95), Inches(1.88), Inches(5.25), Inches(0.36),
+        text="ExtractorAgent Output (Evidence Schema)", font_size=15.5, bold=True, color=SKY,
+    )
+    sample_json = (
+        '{\n'
+        '  "paper_id": "paper-2308.03688",\n'
+        '  "claim": "24% higher bug fix rate",\n'
+        '  "supporting_passage": "Across 300 issues,\n'
+        '    multi-agent setup resolved 24% more.",\n'
+        '  "content_scope": "full_text",\n'
+        '  "confidence": 0.94\n'
+        '}'
+    )
+    add_rect(s6, Inches(0.95), Inches(2.4), Inches(5.25), Inches(3.1), fill_color=RGBColor(30, 41, 59), border_color=RGBColor(71, 85, 105), border_pt=1.0)
+    add_text_box(
+        s6, Inches(1.15), Inches(2.6), Inches(4.85), Inches(2.7),
+        text=sample_json, font_size=13, color=RGBColor(226, 232, 240), font_name=FONT_MONO,
+    )
+    add_text_box(
+        s6, Inches(0.95), Inches(5.82), Inches(5.25), Inches(0.5),
+        text="Strict Rule: No verbatim quote = claim rejected",
+        font_size=14, bold=True, color=RGBColor(74, 222, 128), align=PP_ALIGN.CENTER,
+    )
+
+    gates = [
+        ("AnalystAgent", COBALT, ["Cross-paper thematic clustering", "Comparative methodology matrix"]),
+        ("CriticAgent", AMBER, ["Coverage score (0.0 to 1.0)", "Max 2 keyword revision cycles"]),
+        ("CitationVerifier", EMERALD, ["CrossRef DOI regex check", "100% evidence-claim alignment"]),
     ]
-    for idx, b in enumerate(pts3_2):
-        p = s3_tf2.paragraphs[0] if idx == 0 else s3_tf2.add_paragraph()
-        p.text = "- " + b
-        p.font.size = Pt(13)
-        p.font.color.rgb = COLOR_MUTED
-        p.space_after = Pt(10)
+    for idx, (g_head, g_col, g_pts) in enumerate(gates):
+        gy = Inches(1.68) + idx * Inches(1.72)
+        add_rect(s6, Inches(6.75), gy, Inches(5.88), Inches(1.5), fill_color=WHITE, border_color=BORDER, border_pt=1.2)
+        add_rect(s6, Inches(6.75), gy, Inches(0.12), Inches(1.5), fill_color=g_col, rounded=False)
+        add_text_box(s6, Inches(7.05), gy + Inches(0.16), Inches(5.3), Inches(0.36), text=g_head, font_size=16, bold=True, color=NAVY)
+        tf = add_text_box(s6, Inches(7.05), gy + Inches(0.6), Inches(5.3), Inches(0.8))
+        add_bullets(tf, g_pts, font_size=13.5, space_after=6)
 
-    add_card(s3, Inches(8.83), Inches(1.8), Inches(3.7), Inches(5.1), title="Fact-Based Decisions")
-    s3_c3 = s3.shapes.add_textbox(Inches(9.08), Inches(2.5), Inches(3.2), Inches(4.2))
-    s3_tf3 = s3_c3.text_frame
-    s3_tf3.word_wrap = True
-    pts3_3 = [
-        "Extracts exact empirical claims with supporting verbatim excerpts.",
-        "Constructs comparative matrices highlighting methodological trade-offs.",
-        "Guarantees that production architecture decisions rest on verifiable scientific evidence."
+    add_notes(
+        s6,
+        "On the left is the exact Evidence contract enforced by ExtractorAgent. Every claim requires a verbatim supporting quote and explicit scope tag. "
+        "On the right, AnalystAgent builds cross-study matrices, CriticAgent audits plan coverage and caps automated revisions at two cycles, and CitationVerifier validates every DOI and claim link before report writing."
+    )
+
+    # =========================================================================
+    # SLIDE 7: Human-in-the-Loop & Persistent Checkpointing
+    # =========================================================================
+    s7 = prs.slides.add_slide(blank)
+    add_header_footer(s7, 7, "Oversight & Persistence", "Human Review Gate & SQLite Persistence")
+
+    hitl_steps = [
+        ("1. Interrupt", "interrupt(ReviewPackage)", AMBER),
+        ("2. Inspect", "Papers, quotes, audit", COBALT),
+        ("3. Decide", "Approve / Revise / Reject", TEAL),
+        ("4. Resume", "Command(resume=...)", EMERALD),
     ]
-    for idx, b in enumerate(pts3_3):
-        p = s3_tf3.paragraphs[0] if idx == 0 else s3_tf3.add_paragraph()
-        p.text = "- " + b
-        p.font.size = Pt(13)
-        p.font.color.rgb = COLOR_MUTED
-        p.space_after = Pt(10)
+    hw = Inches(2.78)
+    for idx, (ht, hd, hc) in enumerate(hitl_steps):
+        hx = Inches(0.7) + idx * Inches(3.05)
+        add_rect(s7, hx, Inches(1.68), hw, Inches(1.38), fill_color=WHITE, border_color=hc, border_pt=1.5)
+        add_rect(s7, hx, Inches(1.68), hw, Inches(0.08), fill_color=hc, rounded=False)
+        add_text_box(s7, hx + Inches(0.16), Inches(1.94), hw - Inches(0.32), Inches(0.34), text=ht, font_size=16, bold=True, color=NAVY, align=PP_ALIGN.CENTER)
+        add_text_box(s7, hx + Inches(0.16), Inches(2.38), hw - Inches(0.32), Inches(0.45), text=hd, font_size=12.5, color=CHARCOAL, align=PP_ALIGN.CENTER, font_name=FONT_MONO)
+        if idx < 3:
+            add_text_box(s7, hx + hw + Inches(0.02), Inches(2.18), Inches(0.25), Inches(0.35), text="->", font_size=16, bold=True, color=COBALT, align=PP_ALIGN.CENTER)
 
-    add_speaker_note(s3, "Our primary motivation is accelerating the path from literature review to working production prototypes. Before engineers build a novel system, they must understand existing trade-offs: Which benchmark is standard? What are the known failure modes? What performance boundaries have prior teams documented? By compressing days of literature discovery into minutes while maintaining strict evidence grounding, MAS-RA allows research and engineering teams to make informed architecture decisions and deploy robust prototypes rapidly.")
+    add_rect(s7, Inches(0.7), Inches(3.45), Inches(5.82), Inches(3.2), fill_color=WHITE, border_color=BORDER, border_pt=1.2)
+    add_rect(s7, Inches(0.7), Inches(3.45), Inches(5.82), Inches(0.46), fill_color=COBALT, rounded=False)
+    add_text_box(s7, Inches(0.95), Inches(3.52), Inches(5.3), Inches(0.32), text="Domain Database (service.py)", font_size=14.5, bold=True, color=WHITE)
+    tf_db = add_text_box(s7, Inches(0.95), Inches(4.18), Inches(5.3), Inches(2.2))
+    add_bullets(tf_db, ["0.2s port 5432 socket probe", "Auto fallback to SQLite research.db", "Eager loading via selectinload", "Isolated temp DB for pytest"], font_size=13.5, space_after=14)
+
+    add_rect(s7, Inches(6.81), Inches(3.45), Inches(5.82), Inches(3.2), fill_color=WHITE, border_color=BORDER, border_pt=1.2)
+    add_rect(s7, Inches(6.81), Inches(3.45), Inches(5.82), Inches(0.46), fill_color=EMERALD, rounded=False)
+    add_text_box(s7, Inches(7.06), Inches(3.52), Inches(5.3), Inches(0.32), text="Graph Checkpointer (checkpointer.py)", font_size=14.5, bold=True, color=WHITE)
+    tf_cp = add_text_box(s7, Inches(7.06), Inches(4.18), Inches(5.3), Inches(2.2))
+    add_bullets(tf_cp, ["SQLiteMemorySaver (stdlib sqlite3)", "Zero Windows-blocked DLL imports", "Persists paused HITL interrupts", "Scales to PostgresSaver seamlessly"], font_size=13.5, space_after=14)
+
+    add_notes(
+        s7,
+        "At the top is our four-step Human-in-the-Loop interrupt flow. Below is our dual persistence design: a 0.2 second socket check routes smoothly between PostgreSQL and local SQLite, "
+        "and our custom SQLiteMemorySaver persists LangGraph checkpoints on Python's built-in sqlite3 so paused runs survive server restarts even when binary Postgres drivers are blocked."
+    )
 
     # =========================================================================
-    # SLIDE 4: System Architecture: Stateful Cyclic Graph Formulation
+    # SLIDE 8: Three Interfaces (Minimal Platform Cards)
     # =========================================================================
-    s4 = prs.slides.add_slide(blank_layout)
-    set_slide_background(s4)
-    add_header(s4, "System Architecture: Stateful Cyclic Graph Formulation")
+    s8 = prs.slides.add_slide(blank)
+    add_header_footer(s8, 8, "Full-Stack Delivery", "User, API & Classroom Interfaces")
 
-    add_card(s4, Inches(0.8), Inches(1.8), Inches(11.73), Inches(5.1), title="LangGraph Orchestration Pipeline")
-    s4_box = s4.shapes.add_textbox(Inches(1.1), Inches(2.5), Inches(11.13), Inches(4.2))
-    s4_tf = s4_box.text_frame
-    s4_tf.word_wrap = True
-    arch_pts = [
-        "1. Formulation of Research State: A centralized, immutable Pydantic schema tracking research questions, candidate papers, extracted claims, critique assessments, and verification logs.",
-        "2. Planning and Decomposition (Node plan_research): PlannerAgent decomposes user queries into orthogonal search tasks.",
-        "3. Dynamic Parallel Dispatch (Send API): Concurrently triggers Search Workers across arXiv and Semantic Scholar APIs.",
-        "4. Ingestion and Extraction (Nodes retrieve_pdfs, extract_evidence): Streams open-access PDFs, extracts section text, and isolates verbatim claims.",
-        "5. Thematic Analysis (Node analyze_literature): Synthesizes patterns and comparative matrices across disparate manuscripts.",
-        "6. Automated Reflection Loop (Node critique): CriticAgent evaluates coverage. Triggers revision if score is below 0.70 (bounded to 2 cycles).",
-        "7. Citation Verification (Node verify_citations): Validates DOI syntax and checks claim-passage correspondence.",
-        "8. Human Review Gate (Node human_review): Pauses execution via interrupt() for researcher approval, revision notes, or rejection.",
-        "9. Report Compilation (Node synthesize_summary): ReportWriterAgent compiles publication-grade literature review."
+    interfaces = [
+        ("Streamlit Dashboard", ":8501  |  Interactive UI", COBALT, [
+            "4 synchronized tabs",
+            "Live node progress streaming",
+            "Human review inspection tabs",
+            "Markdown & PDF downloads",
+        ]),
+        ("FastAPI Backend", ":8000/docs  |  REST API", TEAL, [
+            "12 async REST endpoints",
+            "Swagger OpenAPI docs",
+            "Background task execution",
+            "JSON / MD / PDF exports",
+        ]),
+        ("Classroom Visual App", "interactive demo/  |  Offline SPA", EMERALD, [
+            "Pure HTML, CSS, JavaScript",
+            "Step-by-step graph simulator",
+            "Live Deduplicator & DOI lab",
+            "Chart & 4-question quiz",
+        ]),
     ]
-    for idx, b in enumerate(arch_pts):
-        p = s4_tf.paragraphs[0] if idx == 0 else s4_tf.add_paragraph()
-        p.text = b
-        p.font.size = Pt(12)
-        p.font.color.rgb = COLOR_MUTED
-        p.space_after = Pt(6)
+    iw = Inches(3.82)
+    for idx, (ititle, isub, icol, ipts) in enumerate(interfaces):
+        ix = Inches(0.7) + idx * Inches(4.056)
+        add_rect(s8, ix, Inches(1.72), iw, Inches(4.92), fill_color=WHITE, border_color=BORDER, border_pt=1.2)
+        add_rect(s8, ix, Inches(1.72), iw, Inches(0.96), fill_color=SOFT_SLATE, border_color=BORDER, border_pt=1.0, rounded=False)
+        add_rect(s8, ix, Inches(1.72), iw, Inches(0.08), fill_color=icol, rounded=False)
+        add_text_box(s8, ix + Inches(0.24), Inches(1.92), iw - Inches(0.48), Inches(0.36), text=ititle, font_size=17, bold=True, color=NAVY)
+        add_text_box(s8, ix + Inches(0.24), Inches(2.28), iw - Inches(0.48), Inches(0.28), text=isub, font_size=11.5, bold=True, color=icol, font_name=FONT_MONO)
 
-    add_speaker_note(s4, "Here we show the system architecture, structured as a stateful cyclic graph using LangGraph. Traditional linear pipelines fail when discovery requires dynamic adjustment. In our state machine, the central inquiry passes through planning, parallel search fan-out, full-text parsing, evidence extraction, and literature analysis. The graph includes conditional edges where the Critic Agent evaluates coverage, and an interrupt checkpoint where execution halts to allow human review before the final report is compiled.")
+        tf = add_text_box(s8, ix + Inches(0.26), Inches(3.02), iw - Inches(0.52), Inches(3.4))
+        add_bullets(tf, ipts, font_size=14.5, space_after=18)
+
+    add_notes(
+        s8,
+        "MAS-RA runs across three clean interfaces: a four-tab Streamlit dashboard for researchers with live progress streaming and PDF export, "
+        "a 12-endpoint FastAPI REST service for programmatic pipelines, and our offline HTML/CSS/JS classroom simulator inside interactive demo."
+    )
 
     # =========================================================================
-    # SLIDE 5: Agent Architecture: Planning and Parallel Discovery
+    # SLIDE 9: Evaluation & Benchmarks (Native Chart + Minimal KPI Cards)
     # =========================================================================
-    s5 = prs.slides.add_slide(blank_layout)
-    set_slide_background(s5)
-    add_header(s5, "Agent Architecture: Planning and Parallel Discovery")
+    s9 = prs.slides.add_slide(blank)
+    add_header_footer(s9, 9, "Evaluation & QA", "Benchmarks & Automated Verification")
 
-    add_card(s5, Inches(0.8), Inches(1.8), Inches(5.7), Inches(5.1), title="Planner Agent: Strategy Formulation")
-    s5_c1 = s5.shapes.add_textbox(Inches(1.1), Inches(2.5), Inches(5.1), Inches(4.2))
-    s5_tf1 = s5_c1.text_frame
-    s5_tf1.word_wrap = True
-    pl_pts = [
-        "Model Configuration: Powered by OpenAI GPT-4o-mini with structured output via function calling.",
-        "Decomposition Strategy: Analyzes central inquiry and derives 3 to 5 orthogonal research sub-tasks.",
-        "Structured Plan Schema: Each sub-task assigns a specific research objective, targeted query strings, keyword arrays, and search priorities.",
-        "Prevents Narrow Retrieval: Ensures the retrieval phase explores divergent dimensions (e.g. theoretical foundations, benchmarks, and real-world failure cases)."
+    add_rect(s9, Inches(0.7), Inches(1.68), Inches(7.65), Inches(5.0), fill_color=WHITE, border_color=BORDER, border_pt=1.2)
+    add_text_box(
+        s9, Inches(0.95), Inches(1.86), Inches(7.1), Inches(0.36),
+        text="Single-Prompt Baseline vs MAS-RA Pipeline (%)", font_size=15, bold=True, color=NAVY,
+    )
+
+    chart_data = CategoryChartData()
+    chart_data.categories = ["DOI Validity", "Claim Grounding", "Full-Text Scope", "Tests Passing"]
+    chart_data.add_series("Single-Prompt LLM", (40, 25, 10, 0))
+    chart_data.add_series("MAS-RA Multi-Agent", (100, 100, 82, 100))
+
+    chart_frame = s9.shapes.add_chart(
+        XL_CHART_TYPE.COLUMN_CLUSTERED, Inches(0.9), Inches(2.28), Inches(7.25), Inches(4.25), chart_data
+    )
+    chart = chart_frame.chart
+    chart.has_legend = True
+    chart.legend.position = XL_LEGEND_POSITION.BOTTOM
+    chart.legend.include_in_layout = False
+    chart.legend.font.size = Pt(11)
+    chart.legend.font.name = FONT_MAIN
+
+    plot = chart.plots[0]
+    plot.has_data_labels = True
+    plot.data_labels.font.size = Pt(11)
+    plot.data_labels.font.bold = True
+    plot.series[0].format.fill.solid()
+    plot.series[0].format.fill.fore_color.rgb = RGBColor(148, 163, 184)
+    plot.series[1].format.fill.solid()
+    plot.series[1].format.fill.fore_color.rgb = COBALT
+    chart.value_axis.maximum_scale = 110.0
+    chart.value_axis.minimum_scale = 0.0
+    chart.value_axis.tick_labels.font.size = Pt(10.5)
+    chart.category_axis.tick_labels.font.size = Pt(10.5)
+
+    kpis = [
+        ("54 / 54", "Pytest Tests Passing (48.5s)", EMERALD),
+        ("0.85 Score", "Ablation Quality | 100% Grounded", COBALT),
+        ("45 to 90s", "Live End-to-End Review Time", TEAL),
     ]
-    for idx, b in enumerate(pl_pts):
-        p = s5_tf1.paragraphs[0] if idx == 0 else s5_tf1.add_paragraph()
-        p.text = "- " + b
-        p.font.size = Pt(14)
-        p.font.color.rgb = COLOR_MUTED
-        p.space_after = Pt(12)
+    for idx, (k_val, k_lbl, k_col) in enumerate(kpis):
+        ky = Inches(1.68) + idx * Inches(1.74)
+        add_rect(s9, Inches(8.62), ky, Inches(4.01), Inches(1.52), fill_color=WHITE, border_color=BORDER, border_pt=1.2)
+        add_rect(s9, Inches(8.62), ky, Inches(0.12), Inches(1.52), fill_color=k_col, rounded=False)
+        add_text_box(s9, Inches(8.94), ky + Inches(0.24), Inches(3.5), Inches(0.5), text=k_val, font_size=26, bold=True, color=k_col)
+        add_text_box(s9, Inches(8.94), ky + Inches(0.84), Inches(3.5), Inches(0.45), text=k_lbl, font_size=13.5, bold=True, color=NAVY)
 
-    add_card(s5, Inches(6.83), Inches(1.8), Inches(5.7), Inches(5.1), title="Search Workers: Multi-Source Harvesting")
-    s5_c2 = s5.shapes.add_textbox(Inches(7.13), Inches(2.5), Inches(5.1), Inches(4.2))
-    s5_tf2 = s5_c2.text_frame
-    s5_tf2.word_wrap = True
-    sw_pts = [
-        "Dynamic Fan-Out: Executes parallel API requests asynchronously via LangGraph Send primitives.",
-        "arXiv API Integration: Harvests pre-prints in computer science, machine learning, and artificial intelligence.",
-        "Semantic Scholar Graph API: Pulls citation metrics, peer-reviewed journal papers, publication years, and venue metadata.",
-        "Corpus Normalization: Standardizes titles, removes duplicate records, and enforces strict year boundaries (e.g. 2020 to 2026)."
+    add_notes(
+        s9,
+        "Empirically, MAS-RA lifts DOI validity from around 40 percent to 100 percent and achieves 100 percent verbatim claim grounding. "
+        "All 54 pytest unit, API, and workflow tests pass in 48.5 seconds using an isolated test database, and our ablation benchmark scores 0.85 overall quality with 45 to 90 second live latency."
+    )
+
+    # =========================================================================
+    # SLIDE 10: Conclusion & Future Work (Minimal 3 Columns + Q&A Strip)
+    # =========================================================================
+    s10 = prs.slides.add_slide(blank)
+    add_header_footer(s10, 10, "Conclusion", "Lessons Learned, Future Work & Q&A")
+
+    cols = [
+        ("Engineering Fixes", COBALT, [
+            "function_calling schemas",
+            "Stdlib sqlite3 checkpoints",
+            "15s PDF deadline guard",
+            "XML-safe PDF rendering",
+        ]),
+        ("Future Roadmap", AMBER, [
+            "Vision figure & math OCR",
+            "PubMed & IEEE connectors",
+            "Persistent pgvector memory",
+            "Multi-user review teams",
+        ]),
+        ("Key Takeaways", EMERALD, [
+            "State graphs beat prompts",
+            "Verbatim quotes stop errors",
+            "HITL keeps human control",
+            "54/54 verified test suite",
+        ]),
     ]
-    for idx, b in enumerate(sw_pts):
-        p = s5_tf2.paragraphs[0] if idx == 0 else s5_tf2.add_paragraph()
-        p.text = "- " + b
-        p.font.size = Pt(14)
-        p.font.color.rgb = COLOR_MUTED
-        p.space_after = Pt(12)
+    cw10 = Inches(3.82)
+    for idx, (ctitle, ccol, cpts) in enumerate(cols):
+        cx = Inches(0.7) + idx * Inches(4.056)
+        add_rect(s10, cx, Inches(1.68), cw10, Inches(3.92), fill_color=WHITE, border_color=BORDER, border_pt=1.2)
+        add_rect(s10, cx, Inches(1.68), cw10, Inches(0.08), fill_color=ccol, rounded=False)
+        add_text_box(s10, cx + Inches(0.24), Inches(1.94), cw10 - Inches(0.48), Inches(0.36), text=ctitle, font_size=16.5, bold=True, color=NAVY)
+        tf = add_text_box(s10, cx + Inches(0.26), Inches(2.55), cw10 - Inches(0.52), Inches(2.8))
+        add_bullets(tf, cpts, font_size=14, space_after=16)
 
-    add_speaker_note(s5, "In the first operational phase, the Planner Agent functions as the research strategist. It uses structured function calling to decompose a research question into three to five orthogonal sub-queries. These queries are dispatched in parallel via search workers querying both arXiv and the Semantic Scholar Academic Graph. Incoming results are normalized and deduplicated based on DOI and string similarity algorithms, producing a verified corpus of candidate literature.")
+    add_rect(s10, Inches(0.7), Inches(5.88), Inches(11.933), Inches(0.86), fill_color=NAVY, border_color=COBALT, border_pt=1.2)
+    add_text_box(
+        s10, Inches(0.95), Inches(6.02), Inches(4.3), Inches(0.58),
+        text="Thank You!  Questions?", font_size=20, bold=True, color=WHITE, valign=MSO_ANCHOR.MIDDLE,
+    )
+    add_text_box(
+        s10, Inches(5.2), Inches(6.02), Inches(7.2), Inches(0.58),
+        text="UI: :8501   |   API: :8000/docs   |   Simulator: interactive demo/index.html",
+        font_size=12.5, color=SKY, font_name=FONT_MONO, align=PP_ALIGN.RIGHT, valign=MSO_ANCHOR.MIDDLE,
+    )
 
-    # =========================================================================
-    # SLIDE 6: Agent Architecture: Full-Text Ingestion and Evidence Extraction
-    # =========================================================================
-    s6 = prs.slides.add_slide(blank_layout)
-    set_slide_background(s6)
-    add_header(s6, "Agent Architecture: Ingestion and Verbatim Evidence Extraction")
+    add_notes(
+        s10,
+        "In closing, building MAS-RA taught us essential production AI engineering fixes: function_calling schemas, restart-safe sqlite3 checkpointers, PDF download timeouts, and safe XML PDF exports. "
+        "Future additions include multimodal figure parsing, PubMed integration, and cross-project vector memory. Thank you for listening, and I welcome your questions."
+    )
 
-    add_card(s6, Inches(0.8), Inches(1.8), Inches(5.7), Inches(5.1), title="PDF Retrieval and Stream Parsing")
-    s6_c1 = s6.shapes.add_textbox(Inches(1.1), Inches(2.5), Inches(5.1), Inches(4.2))
-    s6_tf1 = s6_c1.text_frame
-    s6_tf1.word_wrap = True
-    pdf_pts = [
-        "In-Memory Payload Fetching: Downloads open-access PDF byte streams without persistent disk pollution.",
-        "Structure Extraction: Uses pypdf to isolate abstract, introduction, methodology, and experimental sections.",
-        "Transparent Fallback Architecture: Paywalled, unreleased, or encrypted documents gracefully fall back to peer-reviewed abstracts.",
-        "Scope Metadata Tagging: Attaches provenance flags directly to the paper record (content_scope: full_text versus abstract_only)."
-    ]
-    for idx, b in enumerate(pdf_pts):
-        p = s6_tf1.paragraphs[0] if idx == 0 else s6_tf1.add_paragraph()
-        p.text = "- " + b
-        p.font.size = Pt(14)
-        p.font.color.rgb = COLOR_MUTED
-        p.space_after = Pt(12)
-
-    add_card(s6, Inches(6.83), Inches(1.8), Inches(5.7), Inches(5.1), title="Extractor Agent: Verbatim Grounding")
-    s6_c2 = s6.shapes.add_textbox(Inches(7.13), Inches(2.5), Inches(5.1), Inches(4.2))
-    s6_tf2 = s6_c2.text_frame
-    s6_tf2.word_wrap = True
-    ev_pts = [
-        "Zero-Hallucination Policy: Agents are strictly prohibited from generating unsubstantiated empirical claims.",
-        "Formal Evidence Schema: Each record binds claim, supporting_passage, paper_id, and DOI.",
-        "Verbatim Passage Requirement: The supporting_passage must contain the exact sentence quoted from the source text.",
-        "Auditable Provenance: Claims missing direct textual quotes are flagged and discarded prior to synthesis."
-    ]
-    for idx, b in enumerate(ev_pts):
-        p = s6_tf2.paragraphs[0] if idx == 0 else s6_tf2.add_paragraph()
-        p.text = "- " + b
-        p.font.size = Pt(14)
-        p.font.color.rgb = COLOR_MUTED
-        p.space_after = Pt(12)
-
-    add_speaker_note(s6, "In the second operational phase, the PDF Retriever downloads open-access document streams directly into memory, extracting full-text sections. The Evidence Extractor Agent then processes this content under strict constraints. It is prohibited from generating loose summaries. Instead, every extracted claim must include an exact, verbatim quoted sentence from the source text. If a statement cannot be directly grounded in the paper, it is discarded. This guarantees factual provenance for all downstream synthesis.")
-
-    # =========================================================================
-    # SLIDE 7: Agent Architecture: Thematic Synthesis and Critique Loops
-    # =========================================================================
-    s7 = prs.slides.add_slide(blank_layout)
-    set_slide_background(s7)
-    add_header(s7, "Agent Architecture: Thematic Synthesis and Critique Loops")
-
-    add_card(s7, Inches(0.8), Inches(1.8), Inches(5.7), Inches(5.1), title="Literature Analyst: Cross-Paper Synthesis")
-    s7_c1 = s7.shapes.add_textbox(Inches(1.1), Inches(2.5), Inches(5.1), Inches(4.2))
-    s7_tf1 = s7_c1.text_frame
-    s7_tf1.word_wrap = True
-    an_pts = [
-        "Thematic Clustering: Categorizes diverse studies into cohesive methodological and architectural groupings.",
-        "Comparative Matrices: Generates structured Markdown tables comparing objectives, datasets, architectures, and quantitative outcomes.",
-        "Synthesizes Consensus and Discrepancies: Highlights where independent studies corroborate or contradict empirical conclusions.",
-        "Prepares Structured Synthesis: Passes structured ResearchSynthesis object to downstream evaluation nodes."
-    ]
-    for idx, b in enumerate(an_pts):
-        p = s7_tf1.paragraphs[0] if idx == 0 else s7_tf1.add_paragraph()
-        p.text = "- " + b
-        p.font.size = Pt(14)
-        p.font.color.rgb = COLOR_MUTED
-        p.space_after = Pt(12)
-
-    add_card(s7, Inches(6.83), Inches(1.8), Inches(5.7), Inches(5.1), title="Critic Agent: Self-Reflection Mechanism")
-    s7_c2 = s7.shapes.add_textbox(Inches(7.13), Inches(2.5), Inches(5.1), Inches(4.2))
-    s7_tf2 = s7_c2.text_frame
-    s7_tf2.word_wrap = True
-    cr_pts = [
-        "Audit Against Objectives: Compares extracted claims and synthesis directly against the Planner initial plan.",
-        "Quantitative Quality Scoring: Assigns an objective Quality Score from 0.00 to 1.00 based on breadth and citation depth.",
-        "Gap Identification: Pinpoints unaddressed subfields, missing benchmarks, or unresolved trade-offs.",
-        "Bounded Cyclic Loop: If score is under 0.70 and cycles are under 2, generates targeted queries and re-engages search workers."
-    ]
-    for idx, b in enumerate(cr_pts):
-        p = s7_tf2.paragraphs[0] if idx == 0 else s7_tf2.add_paragraph()
-        p.text = "- " + b
-        p.font.size = Pt(14)
-        p.font.color.rgb = COLOR_MUTED
-        p.space_after = Pt(12)
-
-    add_speaker_note(s7, "The third phase introduces thematic analysis and self-reflection. The Literature Analyst groups papers into methodological clusters and comparative matrices. Then, the Critic Agent evaluates coverage against the initial research plan. If the Critic determines that key benchmarks or subtopics are missing, it calculates a Quality Score below 0.70, generates new targeted queries, and automatically loops execution back to the search workers. This bounded reflection loop guarantees comprehensive coverage before moving forward.")
-
-    # =========================================================================
-    # SLIDE 8: Agent Architecture: Citation Verification and Human Oversight
-    # =========================================================================
-    s8 = prs.slides.add_slide(blank_layout)
-    set_slide_background(s8)
-    add_header(s8, "Agent Architecture: Citation Verification and Human Oversight")
-
-    add_card(s8, Inches(0.8), Inches(1.8), Inches(5.7), Inches(5.1), title="Citation Verifier and Report Writer")
-    s8_c1 = s8.shapes.add_textbox(Inches(1.1), Inches(2.5), Inches(5.1), Inches(4.2))
-    s8_tf1 = s8_c1.text_frame
-    s8_tf1.word_wrap = True
-    cit_pts = [
-        "Bibliographic Verification: Validates syntax and resolve status of Digital Object Identifiers (DOIs).",
-        "Grounding Cross-Check: Confirms that every cited paper correlates with stored empirical evidence records.",
-        "Publication-Grade Synthesis: ReportWriterAgent compiles structured academic reports.",
-        "Standard Section Layout: Executive Abstract, Introduction, Thematic Sections, Comparative Matrix, Research Gaps, Threats to Validity, and References."
-    ]
-    for idx, b in enumerate(cit_pts):
-        p = s8_tf1.paragraphs[0] if idx == 0 else s8_tf1.add_paragraph()
-        p.text = "- " + b
-        p.font.size = Pt(14)
-        p.font.color.rgb = COLOR_MUTED
-        p.space_after = Pt(12)
-
-    add_card(s8, Inches(6.83), Inches(1.8), Inches(5.7), Inches(5.1), title="Human-in-the-Loop (HITL) Checkpoint")
-    s8_c2 = s8.shapes.add_textbox(Inches(7.13), Inches(2.5), Inches(5.1), Inches(4.2))
-    s8_tf2 = s8_c2.text_frame
-    s8_tf2.word_wrap = True
-    hitl_pts = [
-        "Checkpoint Interrupt: Graph execution halts prior to report synthesis via LangGraph interrupt() primitive.",
-        "Comprehensive Review Package: Delivers candidate papers, verbatim evidence quotes, Critic score, and verification audits.",
-        "Approve Decision: Resumes graph and synthesizes final report immediately.",
-        "Request Revision: Injects researcher feedback and dispatches focused search workers.",
-        "Reject Decision: Halts run cleanly with full audit logging in the database."
-    ]
-    for idx, b in enumerate(hitl_pts):
-        p = s8_tf2.paragraphs[0] if idx == 0 else s8_tf2.add_paragraph()
-        p.text = "- " + b
-        p.font.size = Pt(14)
-        p.font.color.rgb = COLOR_MUTED
-        p.space_after = Pt(12)
-
-    add_speaker_note(s8, "Phase four ensures verification and accountability. The Citation Verifier confirms that every DOI matches academic standards and that every claim maps to an extracted evidence passage. Following verification, the system halts at a Human-in-the-Loop checkpoint using native LangGraph interrupts. The researcher can review candidate papers, inspect the verbatim quotations, evaluate the Critic's quality score, and submit a decision. Upon approval, the Report Writer Agent generates the final publication-grade synthesis.")
-
-    # =========================================================================
-    # SLIDE 9: User Interface: Streamlit Monitoring Dashboard
-    # =========================================================================
-    s9 = prs.slides.add_slide(blank_layout)
-    set_slide_background(s9)
-    add_header(s9, "User Interface: Streamlit Monitoring Dashboard")
-
-    v_w = Inches(2.7)
-    v_h = Inches(5.1)
-    
-    # 4 View Cards
-    add_card(s9, Inches(0.8), Inches(1.8), v_w, v_h, title="1. Projects View")
-    tb = s9.shapes.add_textbox(Inches(0.95), Inches(2.5), Inches(2.4), Inches(4.2))
-    tf = tb.text_frame; tf.word_wrap = True
-    for p_txt in ["Configure research inquiry and scope parameters.", "Select target papers (1 to 20).", "Filter publication years and repositories.", "Toggle Human-in-the-Loop checkpoint requirement."]:
-        p = tf.add_paragraph() if tf.paragraphs[0].text else tf.paragraphs[0]
-        p.text = "- " + p_txt; p.font.size = Pt(12); p.font.color.rgb = COLOR_MUTED; p.space_after = Pt(8)
-
-    add_card(s9, Inches(3.8), Inches(1.8), v_w, v_h, title="2. Active Monitor")
-    tb = s9.shapes.add_textbox(Inches(3.95), Inches(2.5), Inches(2.4), Inches(4.2))
-    tf = tb.text_frame; tf.word_wrap = True
-    for p_txt in ["Real-time execution monitoring via st.status.", "Live node progress streaming across all agents.", "Instant display of harvested paper and evidence counts.", "Direct navigation shortcuts between pipeline phases."]:
-        p = tf.add_paragraph() if tf.paragraphs[0].text else tf.paragraphs[0]
-        p.text = "- " + p_txt; p.font.size = Pt(12); p.font.color.rgb = COLOR_MUTED; p.space_after = Pt(8)
-
-    add_card(s9, Inches(6.8), Inches(1.8), v_w, v_h, title="3. Human Review")
-    tb = s9.shapes.add_textbox(Inches(6.95), Inches(2.5), Inches(2.4), Inches(4.2))
-    tf = tb.text_frame; tf.word_wrap = True
-    for p_txt in ["Tab 1: Harvested literature and DOI links.", "Tab 2: Grounded evidence excerpts with verbatim quotes.", "Tab 3: Thematic audit and quality scores.", "Action buttons: Approve, Revise, or Reject."]:
-        p = tf.add_paragraph() if tf.paragraphs[0].text else tf.paragraphs[0]
-        p.text = "- " + p_txt; p.font.size = Pt(12); p.font.color.rgb = COLOR_MUTED; p.space_after = Pt(8)
-
-    add_card(s9, Inches(9.8), Inches(1.8), v_w, v_h, title="4. Report Library")
-    tb = s9.shapes.add_textbox(Inches(9.95), Inches(2.5), Inches(2.4), Inches(4.2))
-    tf = tb.text_frame; tf.word_wrap = True
-    for p_txt in ["Full rendered academic Markdown display.", "Executive abstract, themes, and matrices.", "One-click Download Markdown (.md).", "One-click Download Styled PDF (.pdf) via ReportLab."]:
-        p = tf.add_paragraph() if tf.paragraphs[0].text else tf.paragraphs[0]
-        p.text = "- " + p_txt; p.font.size = Pt(12); p.font.color.rgb = COLOR_MUTED; p.space_after = Pt(8)
-
-    add_speaker_note(s9, "To provide an intuitive user experience, we developed a four-view Streamlit dashboard. Users initiate research projects, set target corpus limits, and specify date constraints in the Project view. In the Active Monitor, real-time status streaming displays each agent as it executes. When the checkpoint is reached, the Human Review view allows researchers to inspect verbatim passages and approve synthesis. Finally, the Literature Review Library presents the complete report with instant Markdown and styled PDF export options.")
-
-    # =========================================================================
-    # SLIDE 10: Backend Architecture: FastAPI and Persistence
-    # =========================================================================
-    s10 = prs.slides.add_slide(blank_layout)
-    set_slide_background(s10)
-    add_header(s10, "Backend Architecture: FastAPI and Persistence Infrastructure")
-
-    add_card(s10, Inches(0.8), Inches(1.8), Inches(5.7), Inches(5.1), title="FastAPI RESTful Layer")
-    s10_c1 = s10.shapes.add_textbox(Inches(1.1), Inches(2.5), Inches(5.1), Inches(4.2))
-    s10_tf1 = s10_c1.text_frame
-    s10_tf1.word_wrap = True
-    api_pts = [
-        "Twelve Production Endpoints: Full CRUD operations for projects, runs, checkpoints, and reports.",
-        "Interactive Documentation: Integrated Swagger UI available at http://localhost:8000/docs.",
-        "Asynchronous Execution: Non-blocking request handling for concurrent multi-agent graph runs.",
-        "Strict Pydantic Validation: End-to-end schema validation on input parameters and response payloads."
-    ]
-    for idx, b in enumerate(api_pts):
-        p = s10_tf1.paragraphs[0] if idx == 0 else s10_tf1.add_paragraph()
-        p.text = "- " + b
-        p.font.size = Pt(14)
-        p.font.color.rgb = COLOR_MUTED
-        p.space_after = Pt(12)
-
-    add_card(s10, Inches(6.83), Inches(1.8), Inches(5.7), Inches(5.1), title="Persistence and Database Service")
-    s10_c2 = s10.shapes.add_textbox(Inches(7.13), Inches(2.5), Inches(5.1), Inches(4.2))
-    s10_tf2 = s10_c2.text_frame
-    s10_tf2.word_wrap = True
-    db_pts = [
-        "SQLAlchemy ORM: Normalized relational models (ProjectModel, ResearchRunModel, ReportModel).",
-        "Eager Loading (selectinload): Eliminates DetachedInstanceError across session lifecycles.",
-        "Intelligent Socket Fallback: Probes port 5432 with 0.2s timeout; falls back to SQLite (research.db) if PostgreSQL is offline.",
-        "Checkpointer Singleton: Preserves in-memory LangGraph checkpoints across Streamlit reruns."
-    ]
-    for idx, b in enumerate(db_pts):
-        p = s10_tf2.paragraphs[0] if idx == 0 else s10_tf2.add_paragraph()
-        p.text = "- " + b
-        p.font.size = Pt(14)
-        p.font.color.rgb = COLOR_MUTED
-        p.space_after = Pt(12)
-
-    add_speaker_note(s10, "The backend infrastructure is built on FastAPI and SQLAlchemy. The API exposes twelve REST endpoints supporting full programmatic control over research runs, reviews, and document downloads. For data persistence, we engineered an intelligent socket pre-check that inspects port 5432 with a 0.2-second timeout. If PostgreSQL is unavailable, it immediately routes transactions to a local SQLite database without connection delays. This architecture provides production scalability alongside frictionless local execution.")
-
-    # =========================================================================
-    # SLIDE 11: Experimental Evaluation: Test Coverage and Benchmarks
-    # =========================================================================
-    s11 = prs.slides.add_slide(blank_layout)
-    set_slide_background(s11)
-    add_header(s11, "Experimental Evaluation: Test Coverage and Benchmarks")
-
-    add_card(s11, Inches(0.8), Inches(1.8), Inches(11.73), Inches(5.1), title="Quantitative Verification Metrics")
-    s11_box = s11.shapes.add_textbox(Inches(1.1), Inches(2.5), Inches(11.13), Inches(4.2))
-    s11_tf = s11_box.text_frame
-    s11_tf.word_wrap = True
-
-    eval_pts = [
-        "Automated Test Suite: 52 out of 52 tests passing (100% test pass rate in 100.80 seconds).",
-        "Coverage Scope: Comprehensive unit, integration, database repository, API route, and end-to-end graph tests.",
-        "Comparative Evaluation Metrics:"
-    ]
-    for b in eval_pts:
-        p = s11_tf.add_paragraph() if s11_tf.paragraphs[0].text else s11_tf.paragraphs[0]
-        p.text = b
-        p.font.size = Pt(14)
-        p.font.bold = True if "Automated" in b else False
-        p.font.color.rgb = COLOR_PRIMARY if "Automated" in b else COLOR_MUTED
-        p.space_after = Pt(6)
-
-    # Insert Table Shape on slide 11
-    rows, cols = 6, 3
-    t_left, t_top, t_w, t_h = Inches(1.1), Inches(4.1), Inches(11.13), Inches(2.4)
-    table_shape = s11.shapes.add_table(rows, cols, t_left, t_top, t_w, t_h)
-    t = table_shape.table
-    t.columns[0].width = Inches(3.7)
-    t.columns[1].width = Inches(3.7)
-    t.columns[2].width = Inches(3.73)
-
-    table_data = [
-        ["Evaluation Dimension", "Single-Prompt LLM (Baseline)", "MAS-RA Multi-Agent System"],
-        ["DOI Verification Rate", "Approx. 40% (Frequent Hallucination)", "100% Validated (Zero Hallucination)"],
-        ["Empirical Claim Grounding", "Inconsistent / Untraceable", "100% Verbatim Quoted Excerpts"],
-        ["Full-Text Ingestion", "Not Supported (Context Overflow)", "Streaming PDF Section Parsing"],
-        ["Autonomous Reflection", "Absent", "Automated Bounded Critique Loops"],
-        ["Synthesis Latency", "10 to 15 seconds (Shallow Summary)", "45 to 90 seconds (Systematic Review)"]
-    ]
-
-    for r_idx, row in enumerate(table_data):
-        for c_idx, val in enumerate(row):
-            cell = t.cell(r_idx, c_idx)
-            cell.text = val
-            p = cell.text_frame.paragraphs[0]
-            p.font.name = "Calibri"
-            p.font.size = Pt(11) if r_idx > 0 else Pt(12)
-            p.font.bold = True if r_idx == 0 or c_idx == 2 else False
-            p.font.color.rgb = COLOR_PRIMARY if r_idx == 0 else COLOR_MUTED
-            if r_idx == 0:
-                cell.fill.solid()
-                cell.fill.fore_color.rgb = RGBColor(226, 232, 240)
-
-    add_speaker_note(s11, "To evaluate system correctness and reliability, we established an automated test suite of 52 tests covering agents, database models, API routes, and full workflow graphs. All 52 tests pass with a 100% success rate. In empirical benchmarks, MAS-RA eliminates the severe hallucination rates common to single-prompt LLMs, achieving 100% DOI validation and 100% verbatim claim grounding, completing a rigorous, systematic review across multiple papers in under 90 seconds.")
-
-    # =========================================================================
-    # SLIDE 12: Discussion, Limitations, and Conclusion
-    # =========================================================================
-    s12 = prs.slides.add_slide(blank_layout)
-    set_slide_background(s12)
-    add_header(s12, "Discussion, Limitations, and Conclusion")
-
-    add_card(s12, Inches(0.8), Inches(1.8), Inches(5.7), Inches(5.1), title="Limitations and Future Directions")
-    s12_c1 = s12.shapes.add_textbox(Inches(1.1), Inches(2.5), Inches(5.1), Inches(4.2))
-    s12_tf1 = s12_c1.text_frame
-    s12_tf1.word_wrap = True
-    lim_pts = [
-        "Open-Access Boundary: Commercial paywalls restrict full-text retrieval; system falls back to peer-reviewed abstracts.",
-        "Multimodal Figure Parsing: Mathematical formula parsing and architectural diagram analysis require vision-language models.",
-        "Future Ingestion: Extending connectors to PubMed (biomedical) and IEEE Xplore (applied engineering).",
-        "Vector Memory: Integrating persistent vector indexes (Qdrant or Chroma) for semantic cross-review querying."
-    ]
-    for idx, b in enumerate(lim_pts):
-        p = s12_tf1.paragraphs[0] if idx == 0 else s12_tf1.add_paragraph()
-        p.text = "- " + b
-        p.font.size = Pt(14)
-        p.font.color.rgb = COLOR_MUTED
-        p.space_after = Pt(12)
-
-    add_card(s12, Inches(6.83), Inches(1.8), Inches(5.7), Inches(5.1), title="Summary and Academic Takeaway")
-    s12_c2 = s12.shapes.add_textbox(Inches(7.13), Inches(2.5), Inches(5.1), Inches(4.2))
-    s12_tf2 = s12_c2.text_frame
-    s12_tf2.word_wrap = True
-    conc_pts = [
-        "Building Over Prompting: Constructing autonomous systems from scratch unlocks capabilities single-prompt architectures cannot attain.",
-        "Grounded Reliability: Coupling evidence extraction to verbatim quotes completely neutralizes hallucination.",
-        "Human-Centric Automation: Checkpoint interrupts maintain human agency over scientific synthesis.",
-        "System Endpoints: Web UI running at http://localhost:8501; FastAPI Docs at http://localhost:8000/docs.",
-        "Questions and Discussion: Open for questions from professor and peers."
-    ]
-    for idx, b in enumerate(conc_pts):
-        p = s12_tf2.paragraphs[0] if idx == 0 else s12_tf2.add_paragraph()
-        p.text = "- " + b
-        p.font.size = Pt(14)
-        p.font.bold = True if "Building" in b or "Questions" in b else False
-        p.font.color.rgb = COLOR_PRIMARY if "Building" in b or "Questions" in b else COLOR_MUTED
-        p.space_after = Pt(10)
-
-    add_speaker_note(s12, "To conclude, our work demonstrates that the transition from passive prompting to active multi-agent engineering overcomes the core limitations of modern language models in academic workflows. While future versions will integrate multimodal figure parsing and additional academic databases, MAS-RA currently provides a working, verifiable, and evidence-grounded literature review engine. Thank you for your attention, and we are now open to your questions and academic discussion.")
-
-    # Save presentation
     output_path = os.path.abspath("MAS_RA_Academic_Presentation.pptx")
     prs.save(output_path)
-    print(f"Presentation generated successfully: {output_path}")
+    print(f"Minimal presentation built cleanly: {output_path} ({len(prs.slides)} slides)")
+
 
 if __name__ == "__main__":
-    create_presentation()
-
+    build_deck()
