@@ -1,9 +1,30 @@
 """Pytest fixtures and test environment configuration."""
 
+import os
 import pytest
+import app.database.service as db_service
 from app.config import Settings
 from app.schemas.papers import Paper, PaperSource
 from app.schemas.research import ResearchPlan, ResearchScope, ResearchTask
+
+
+@pytest.fixture(autouse=True, scope="session")
+def isolate_test_database(tmp_path_factory):
+    """Redirect SQLite test writes away from the production research.db file."""
+    tmp_db = tmp_path_factory.mktemp("test_db") / "pytest_research.db"
+    prev_val = os.environ.get("MAS_LOCAL_SQLITE_URL")
+    os.environ["MAS_LOCAL_SQLITE_URL"] = f"sqlite:///{tmp_db.as_posix()}"
+    db_service._engine = None
+    db_service._SessionFactory = None
+    yield
+    if db_service._engine is not None:
+        db_service._engine.dispose()
+    db_service._engine = None
+    db_service._SessionFactory = None
+    if prev_val is None:
+        os.environ.pop("MAS_LOCAL_SQLITE_URL", None)
+    else:
+        os.environ["MAS_LOCAL_SQLITE_URL"] = prev_val
 
 
 @pytest.fixture

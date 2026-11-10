@@ -1,5 +1,6 @@
 """Academic Report Writer Agent for synthesizing literature review reports."""
 
+import logging
 import uuid
 from typing import Any, Dict, List, Optional
 from langchain_core.messages import HumanMessage, SystemMessage
@@ -9,6 +10,8 @@ from app.graph.prompts import WRITER_SYSTEM_PROMPT
 from app.schemas.evidence import Evidence
 from app.schemas.papers import Paper
 from app.schemas.report import CitationCheck, ReportSection, ResearchReport
+
+logger = logging.getLogger(__name__)
 
 
 class ReportWriterAgent:
@@ -54,8 +57,8 @@ class ReportWriterAgent:
                     synthesis=synthesis,
                     citation_checks=citation_checks,
                 )
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning(f"ReportWriter LLM synthesis failed ({e}); falling back to deterministic report.", exc_info=True)
 
         # Robust deterministic fallback
         return self._write_deterministic(

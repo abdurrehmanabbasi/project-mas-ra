@@ -64,3 +64,27 @@ def test_export_markdown_and_pdf():
         assert os.path.exists(saved_pdf)
         assert os.path.getsize(saved_pdf) > 500  # Non-trivial PDF output
 
+
+def test_export_pdf_escapes_xml_characters(tmp_path):
+    """Verify ReportExporter handles raw <, >, & characters and markdown styling in PDF output."""
+    report = ResearchReport(
+        report_id="rep-xml-test",
+        project_id="proj-xml",
+        title="Frameworks & Benchmarks: Accuracy < 0.9 & Speed > 1.5x",
+        abstract="Evaluates Q&A systems with **bold findings** & `inline_code` where loss < 0.05.",
+        introduction="Intro covering A & B < C > D.",
+        sections=[
+            ReportSection(
+                title="Section 1 & 2",
+                content="Content with <raw_tag> & **emphasis**.",
+            )
+        ],
+        comparative_analysis="System A > System B & C < D.",
+        research_gaps=["Benchmark coverage < 50% & lack of standards"],
+        limitations="Limited to < 5 papers & open-access repositories.",
+    )
+    pdf_path = str(tmp_path / "escaped.pdf")
+    saved = ReportExporter.export_pdf(report, pdf_path)
+    assert os.path.exists(saved)
+    assert os.path.getsize(saved) > 500
+

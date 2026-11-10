@@ -2,6 +2,7 @@
 
 import json
 import logging
+import os
 import socket
 from typing import Any, Dict, List, Optional
 from sqlalchemy import create_engine
@@ -30,10 +31,11 @@ def get_db_engine():
     if _engine is None:
         settings = get_settings()
         db_url = settings.DATABASE_URL
+        local_sqlite_url = os.environ.get("MAS_LOCAL_SQLITE_URL", "sqlite:///./research.db")
 
         # Quick pre-check: if URL specifies postgres, check if port 5432 is reachable
         if ("postgresql" in db_url or "psycopg" in db_url) and not _is_postgres_available():
-            db_url = "sqlite:///./research.db"
+            db_url = local_sqlite_url
 
         connect_args = {}
         if "sqlite" in db_url:
@@ -47,8 +49,7 @@ def get_db_engine():
                 pass
         except Exception as e:
             logger.info(f"Using SQLite local db (PostgreSQL unavailable: {e}).")
-            sqlite_url = "sqlite:///./research.db"
-            _engine = create_engine(sqlite_url, connect_args={"check_same_thread": False})
+            _engine = create_engine(local_sqlite_url, connect_args={"check_same_thread": False})
 
         # Initialize schema tables
         Base.metadata.create_all(_engine)
@@ -157,6 +158,7 @@ class DatabaseService:
         papers_count: Optional[int] = None,
         evidence_count: Optional[int] = None,
         error_message: Optional[str] = None,
+        thread_id: Optional[str] = None,
     ) -> Optional[ResearchRunModel]:
         session = get_db_session()
         try:
@@ -164,6 +166,8 @@ class DatabaseService:
             if not run:
                 return None
             run.status = status
+            if thread_id:
+                run.thread_id = thread_id
             if current_phase:
                 run.current_phase = current_phase
             if papers_count is not None:
@@ -172,6 +176,8 @@ class DatabaseService:
                 run.evidence_count = evidence_count
             if error_message is not None:
                 run.error_message = error_message
+            elif status in ("queued", "completed"):
+                run.error_message = None
             session.commit()
             session.refresh(run)
             return run

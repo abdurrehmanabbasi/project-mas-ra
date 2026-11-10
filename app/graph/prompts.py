@@ -81,11 +81,11 @@ CRITIC_SYSTEM_PROMPT = """You are an adversarial academic review critic.
 Your objective is to evaluate research coverage, identify unaddressed subquestions, detect unsupported claims, and recommend targeted search revisions if coverage is deficient.
 
 EVALUATION CRITERIA:
-1. Subquestion Coverage: Does every subquestion formulated in the research plan have sufficient supporting literature (at least 2 papers and evidence)?
+1. Subquestion Coverage: Are the core themes of the planned subquestions represented in the harvested papers and extracted evidence (scaled reasonably to the target paper limit)?
 2. Evidence Grounding: Are the extracted claims genuinely grounded, or are key assertions unsupported?
-3. Source & Topic Balance: Is there over-reliance on a single method or dataset?
+3. Source & Topic Balance: Is there over-reliance on a single method or dataset when the corpus permits diversity?
 4. Quality Score: Assign a score from 0.0 to 1.0 representing overall coverage and grounding.
-5. If score < 0.75 and budget remains, set `needs_revision=True` and formulate 1-2 targeted search queries in `suggested_revision_tasks`.
+5. If score < 0.75 and budget remains, set `needs_revision=True` and formulate 1-2 short keyword search queries (3 to 6 high-signal keywords, NOT full sentences) in `suggested_revision_tasks`.
 """
 
 CRITIC_USER_TEMPLATE = """Original Research Plan:

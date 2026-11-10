@@ -1,6 +1,8 @@
 """Export utilities for transforming ResearchReport into Markdown and styled PDF documents."""
 
+import html
 import os
+import re
 from pathlib import Path
 from typing import Optional
 from app.schemas.report import ResearchReport
@@ -171,51 +173,61 @@ class ReportExporter:
             spaceAfter=12,
         )
 
+        def _to_rl_html(text: str) -> str:
+            escaped = html.escape(text or "", quote=False)
+            escaped = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", escaped)
+            escaped = re.sub(r"`([^`]+)`", r"<font name='Courier'>\1</font>", escaped)
+            return escaped.replace("\n", "<br/>")
+
         story = []
 
         # Title & Metadata
-        story.append(Paragraph(report.title, title_style))
-        story.append(Paragraph(f"<b>Project ID:</b> {report.project_id} &nbsp;|&nbsp; <b>Report ID:</b> {report.report_id}", body_style))
+        story.append(Paragraph(_to_rl_html(report.title), title_style))
+        story.append(
+            Paragraph(
+                f"<b>Project ID:</b> {html.escape(report.project_id)} &nbsp;|&nbsp; <b>Report ID:</b> {html.escape(report.report_id)}",
+                body_style,
+            )
+        )
         story.append(HRFlowable(width="100%", thickness=1.5, color=colors.HexColor("#3182CE"), spaceBefore=6, spaceAfter=14))
 
         # Abstract
         story.append(Paragraph("<b>Executive Abstract</b>", h2_style))
-        story.append(Paragraph(report.abstract.replace("\n", "<br/>"), abstract_style))
+        story.append(Paragraph(_to_rl_html(report.abstract), abstract_style))
         story.append(Spacer(1, 8))
 
         # Introduction
         story.append(Paragraph("1. Introduction", h1_style))
-        intro_clean = report.introduction.replace("## Introduction & Problem Context\n\n", "").replace("\n\n", "<br/><br/>")
-        story.append(Paragraph(intro_clean, body_style))
+        intro_clean = report.introduction.replace("## Introduction & Problem Context\n\n", "")
+        story.append(Paragraph(_to_rl_html(intro_clean), body_style))
         story.append(Spacer(1, 8))
 
         # Thematic Sections
         sec_num = 2
         for sec in report.sections:
-            story.append(Paragraph(f"{sec_num}. {sec.title}", h1_style))
-            content_html = sec.content.replace("\n\n", "<br/><br/>").replace("\n", "<br/>")
-            story.append(Paragraph(content_html, body_style))
+            story.append(Paragraph(_to_rl_html(f"{sec_num}. {sec.title}"), h1_style))
+            story.append(Paragraph(_to_rl_html(sec.content), body_style))
             story.append(Spacer(1, 6))
             sec_num += 1
 
         # Comparative Analysis
-        story.append(Paragraph(f"{sec_num}. Cross-Paper Synthesis & Comparative Analysis", h1_style))
+        story.append(Paragraph(f"{sec_num}. Cross-Paper Synthesis &amp; Comparative Analysis", h1_style))
         sec_num += 1
-        comp_clean = report.comparative_analysis.replace("## Cross-Paper Comparative Analysis\n", "").replace("\n", "<br/>")
-        story.append(Paragraph(comp_clean, body_style))
+        comp_clean = report.comparative_analysis.replace("## Cross-Paper Comparative Analysis\n", "")
+        story.append(Paragraph(_to_rl_html(comp_clean), body_style))
         story.append(Spacer(1, 8))
 
         # Research Gaps
-        story.append(Paragraph(f"{sec_num}. Open Research Gaps & Future Work", h1_style))
+        story.append(Paragraph(f"{sec_num}. Open Research Gaps &amp; Future Work", h1_style))
         sec_num += 1
         for gap in report.research_gaps:
-            story.append(Paragraph(f"• <b>{gap}</b>", body_style))
+            story.append(Paragraph(f"• <b>{_to_rl_html(gap)}</b>", body_style))
         story.append(Spacer(1, 8))
 
         # Limitations
-        story.append(Paragraph(f"{sec_num}. Limitations & Review Validity", h1_style))
+        story.append(Paragraph(f"{sec_num}. Limitations &amp; Review Validity", h1_style))
         sec_num += 1
-        story.append(Paragraph(report.limitations.replace("\n", "<br/>"), body_style))
+        story.append(Paragraph(_to_rl_html(report.limitations), body_style))
         story.append(Spacer(1, 10))
 
         # References
@@ -224,7 +236,7 @@ class ReportExporter:
         for ref in report.references:
             label = ref.get("citation_label") or f"[{ref.get('paper_id')}] {ref.get('title')}"
             doi_info = f" (DOI: {ref.get('doi')})" if ref.get("doi") else ""
-            ref_text = f"• {label}{doi_info}"
+            ref_text = f"• {_to_rl_html(f'{label}{doi_info}')}"
             story.append(Paragraph(ref_text, body_style))
 
         doc.build(story)

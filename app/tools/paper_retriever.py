@@ -1,6 +1,7 @@
 """Paper retrieval tool downloading open-access academic PDFs."""
 
 import logging
+import time
 from typing import Optional
 import httpx
 
@@ -63,10 +64,16 @@ class PaperRetriever:
                         )
                         return None
 
-                    # Read content in chunks while monitoring size
+                    # Read content in chunks while monitoring size and overall wall time
                     chunks = []
                     total_downloaded = 0
+                    start_time = time.monotonic()
                     for chunk in response.iter_bytes(chunk_size=65536):
+                        if time.monotonic() - start_time > self.timeout:
+                            logger.warning(
+                                f"PDF download for '{paper.title}' exceeded {self.timeout}s timeout. Falling back to abstract."
+                            )
+                            return None
                         total_downloaded += len(chunk)
                         if total_downloaded > self.max_bytes:
                             logger.warning(

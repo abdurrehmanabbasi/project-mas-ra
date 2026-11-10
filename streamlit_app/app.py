@@ -68,9 +68,9 @@ if "sidebar_nav_radio" not in st.session_state:
 
 
 def navigate_to(target_menu: str, run_id: Optional[str] = None, project_id: Optional[str] = None, report_id: Optional[str] = None):
-    """Safely navigate between tabs with synchronized session state."""
+    """Safely navigate between tabs using a pre-widget pending redirect key."""
     st.session_state.menu = target_menu
-    st.session_state.sidebar_nav_radio = target_menu
+    st.session_state._pending_nav = target_menu
     if run_id:
         st.session_state.active_run_id = run_id
     if project_id:
@@ -78,6 +78,102 @@ def navigate_to(target_menu: str, run_id: Optional[str] = None, project_id: Opti
     if report_id:
         st.session_state.active_report_id = report_id
     st.rerun()
+
+
+def _stream_graph_updates(graph: Any, payload: Any, config: Dict[str, Any]) -> None:
+    """Stream LangGraph node updates using exact workflow node identifiers."""
+    for chunk in graph.stream(payload, config=config, stream_mode="updates"):
+        if not isinstance(chunk, dict):
+            continue
+        for node_name, node_update in chunk.items():
+            update = node_update if isinstance(node_update, dict) else {}
+            if node_name == "planner":
+                p_tasks = update.get("research_plan", {}).get("tasks", [])
+                st.write(f"📋 **Planner Agent**: Formulated {len(p_tasks)} focused search sub-tasks.")
+            elif node_name == "search_worker":
+                p_list = update.get("search_results", [])
+                st.write(f"🔍 **Search Worker**: Retrieved {len(p_list)} candidate academic papers.")
+            elif node_name == "deduplicate_and_rank":
+                sel = update.get("selected_papers", [])
+                st.write(f"📑 **Deduplication & Ranking**: Selected top {len(sel)} unique publications.")
+            elif node_name == "retrieve_content":
+                contents = update.get("paper_contents", [])
+                st.write(f"📥 **PDF Retriever**: Parsed {len(contents)} paper content record(s).")
+            elif node_name == "extract_evidence":
+                ev_list = update.get("extracted_evidence", [])
+                st.write(f"🔬 **Evidence Extractor**: Extracted {len(ev_list)} empirical claim passages.")
+            elif node_name == "analyze_literature":
+                st.write("📊 **Literature Analyst**: Generated thematic cross-paper comparative matrices.")
+            elif node_name == "critique":
+                crit_val = update.get("critique", {})
+                score = crit_val.get("quality_score", 1.0)
+                needs_rev = crit_val.get("needs_revision", False)
+                suffix = " (dispatching revision searches)" if needs_rev else " (coverage approved)"
+                st.write(f"⚖️ **Critic Agent**: Scored literature coverage at {score:.2f} / 1.00{suffix}.")
+            elif node_name in ("prepare_revision", "prepare_human_revision"):
+                st.write("🔄 **Revision Planner**: Dispatching targeted follow-up search workers...")
+            elif node_name == "verify_citations":
+                checks = update.get("verified_citations", [])
+                st.write(f"✅ **Citation Verifier**: Audited DOIs and grounding across {len(checks)} references.")
+            elif node_name == "human_review":
+                st.write("🛡️ **Human Review**: Recorded reviewer decision.")
+            elif node_name == "synthesize_summary":
+                st.write("📝 **Report Writer Agent**: Publication-grade literature review compiled.")
+            elif node_name == "mark_rejected":
+                st.write("❌ **Workflow Terminated**: Run marked rejected.")
+
+
+def _build_resilient_report_obj(report_row: Any) -> ResearchReport:
+    """Validate stored report JSON into ResearchReport with safe defaults for legacy/partial records."""
+    rep_data = json.loads(report_row.report_json) if report_row.report_json else {}
+    rep_data.setdefault("project_id", report_row.project_id)
+    rep_data.setdefault("report_id", report_row.id)
+    rep_data.setdefault("title", report_row.title)
+    rep_data.setdefault("abstract", "Executive abstract of systematic literature synthesis.")
+    rep_data.setdefault("introduction", rep_data.get("abstract", "Introduction to literature review."))
+    rep_data.setdefault("comparative_analysis", "Thematic comparative analysis across literature.")
+    rep_data.setdefault("limitations", "Threats to validity and empirical study limitations.")
+    rep_data.setdefault("sections", [])
+    rep_data.setdefault("references", [])
+    rep_data.setdefault("citation_checks", [])
+    rep_data.setdefault("research_gaps", [])
+    return ResearchReport.model_validate(rep_data)
+
+
+def _persist_completed_run(run: Any, default_title: str, final_state: Dict[str, Any]) -> Optional[str]:
+    """Persist synthesized report (reconstructing markdown if needed) and mark run completed."""
+    final_rep = final_state.get("final_report", {})
+    saved_rep_id: Optional[str] = None
+    if final_rep:
+        md_content = final_rep.get("content_markdown", "").strip()
+        if not md_content:
+            try:
+                rep_data = dict(final_rep)
+                rep_data.setdefault("project_id", run.project_id)
+                rep_data.setdefault("title", default_title)
+                rep_data.setdefault("abstract", "")
+                rep_data.setdefault("introduction", "")
+                rep_data.setdefault("comparative_analysis", "")
+                rep_data.setdefault("limitations", "")
+                md_content = ReportExporter.to_markdown(ResearchReport.model_validate(rep_data))
+            except Exception:
+                md_content = f"# {final_rep.get('title', default_title)}\n\n{final_rep.get('abstract', '')}"
+        saved_rep = DatabaseService.save_report(
+            project_id=run.project_id,
+            run_id=run.id,
+            title=final_rep.get("title") or default_title,
+            report_dict=final_rep,
+            markdown_content=md_content,
+        )
+        saved_rep_id = saved_rep.id
+    DatabaseService.update_run_status(
+        run_id=run.id,
+        status="completed",
+        current_phase="report_synthesized",
+        papers_count=len(final_state.get("selected_papers", [])),
+        evidence_count=len(final_state.get("extracted_evidence", [])),
+    )
+    return saved_rep_id
 
 
 # ---------------------------------------------------------------------------
@@ -90,6 +186,11 @@ st.sidebar.caption("Autonomous AI Literature Review Assistant")
 def on_sidebar_nav_change():
     st.session_state.menu = st.session_state.sidebar_nav_radio
 
+
+if st.session_state.get("_pending_nav") in MENU_OPTIONS:
+    _target_menu = st.session_state.pop("_pending_nav")
+    st.session_state.menu = _target_menu
+    st.session_state.sidebar_nav_radio = _target_menu
 
 selected_nav = st.sidebar.radio(
     "Navigation",
@@ -330,29 +431,7 @@ elif st.session_state.menu == "Active Run Monitor":
                             st.write("📋 **Planner Agent**: Decomposing research inquiry into orthogonal search tasks...")
 
                             # Stream nodes live as they execute
-                            for chunk in graph.stream(initial_state, config=config, stream_mode="updates"):
-                                for node_name, node_update in chunk.items():
-                                    if node_name == "plan_research":
-                                        p_tasks = node_update.get("research_plan", {}).get("tasks", [])
-                                        st.write(f"📋 **Planner Agent**: Formulated {len(p_tasks)} focused search sub-tasks.")
-                                    elif node_name == "search_worker":
-                                        p_list = node_update.get("selected_papers", [])
-                                        st.write(f"🔍 **Search Worker**: Retrieved {len(p_list)} candidate academic papers.")
-                                    elif node_name == "retrieve_pdfs":
-                                        st.write("📥 **PDF Retriever**: Streamed full-text passages and paper sections.")
-                                    elif node_name == "extract_evidence":
-                                        ev_list = node_update.get("extracted_evidence", [])
-                                        st.write(f"🔬 **Evidence Extractor**: Extracted {len(ev_list)} empirical claim passages.")
-                                    elif node_name == "analyze_literature":
-                                        st.write("📊 **Literature Analyst**: Generated thematic cross-paper comparative matrices.")
-                                    elif node_name == "critique":
-                                        crit_val = node_update.get("critique", {})
-                                        score = crit_val.get("quality_score", 1.0)
-                                        st.write(f"⚖️ **Critic Agent**: Scored literature coverage at {score:.2f} / 1.00.")
-                                    elif node_name == "verify_citations":
-                                        st.write("✅ **Citation Verifier**: Validated DOIs and empirical claim grounding.")
-                                    elif node_name == "synthesize_summary":
-                                        st.write("📝 **Report Writer Agent**: Literature review synthesized.")
+                            _stream_graph_updates(graph, initial_state, config)
 
                             snapshot = graph.get_state(config)
                             final_state = snapshot.values if snapshot else {}
@@ -368,30 +447,12 @@ elif st.session_state.menu == "Active Run Monitor":
                                     papers_count=len(final_state.get("selected_papers", [])),
                                     evidence_count=len(final_state.get("extracted_evidence", [])),
                                 )
-                                time.sleep(1)
+                                time.sleep(0.5)
                                 navigate_to("Human Review Checkpoint", run_id=run.id, project_id=sel_project.id)
                             else:
-                                st.write("📝 **Report Writer Agent**: Compiling academic literature review report...")
                                 status_box.update(label="Research Run Completed Successfully!", state="complete")
-                                final_rep = final_state.get("final_report", {})
-                                saved_rep = None
-                                if final_rep:
-                                    saved_rep = DatabaseService.save_report(
-                                        project_id=run.project_id,
-                                        run_id=run.id,
-                                        title=final_rep.get("title", sel_project.title),
-                                        report_dict=final_rep,
-                                        markdown_content=final_rep.get("content_markdown", ""),
-                                    )
-                                DatabaseService.update_run_status(
-                                    run_id=run.id,
-                                    status="completed",
-                                    current_phase="report_synthesized",
-                                    papers_count=len(final_state.get("selected_papers", [])),
-                                    evidence_count=len(final_state.get("extracted_evidence", [])),
-                                )
-                                time.sleep(1)
-                                rep_id = saved_rep.id if saved_rep else None
+                                rep_id = _persist_completed_run(run, sel_project.title, final_state)
+                                time.sleep(0.5)
                                 navigate_to("Report Library", run_id=run.id, project_id=sel_project.id, report_id=rep_id)
 
                         except Exception as e:
@@ -416,7 +477,14 @@ elif st.session_state.menu == "Active Run Monitor":
             elif run.status == "failed":
                 st.error(f"❌ **Run Failed**: {run.error_message}")
                 if st.button("🔄 Restart Run", use_container_width=True):
-                    DatabaseService.update_run_status(run_id=run.id, status="queued", current_phase="restarting", error_message=None)
+                    new_thread = f"thread-{sel_project.id[:8]}-{int(time.time())}"
+                    DatabaseService.update_run_status(
+                        run_id=run.id,
+                        status="queued",
+                        current_phase="restarting",
+                        error_message=None,
+                        thread_id=new_thread,
+                    )
                     st.rerun()
 
 
@@ -505,7 +573,13 @@ elif st.session_state.menu == "Human Review Checkpoint":
             col_c1, col_c2 = st.columns(2)
             with col_c1:
                 if st.button("⚡ Relaunch Run in Active Monitor", type="primary", use_container_width=True):
-                    DatabaseService.update_run_status(run_id=run.id, status="queued", current_phase="restarting")
+                    new_thread = f"thread-{run.project_id[:8]}-{int(time.time())}"
+                    DatabaseService.update_run_status(
+                        run_id=run.id,
+                        status="queued",
+                        current_phase="restarting",
+                        thread_id=new_thread,
+                    )
                     navigate_to("Active Run Monitor", run_id=run.id, project_id=run.project_id)
             with col_c2:
                 if st.button("➕ Start Fresh Run for this Project", use_container_width=True):
@@ -581,50 +655,44 @@ elif st.session_state.menu == "Human Review Checkpoint":
 
             with col_dec1:
                 if st.button("✅ Approve & Synthesize Final Report", type="primary", use_container_width=True):
-                    with st.spinner("Resuming graph & synthesizing final academic report with GPT-4o-mini..."):
+                    with st.status("Resuming graph & synthesizing final academic report...", expanded=True) as approve_status:
                         try:
                             cmd = Command(resume={"action": "approve"})
-                            final_state = graph.invoke(cmd, config=config)
-                            final_rep = final_state.get("final_report", {})
-                            saved_rep = None
-                            if final_rep:
-                                rep_title = final_rep.get("title") or f"Systematic Review: {p_title}"
-                                saved_rep = DatabaseService.save_report(
-                                    project_id=run.project_id,
-                                    run_id=run.id,
-                                    title=rep_title,
-                                    report_dict=final_rep,
-                                    markdown_content=final_rep.get("content_markdown", ""),
-                                )
-                            DatabaseService.update_run_status(
-                                run_id=run.id,
-                                status="completed",
-                                current_phase="report_synthesized",
-                                papers_count=len(final_state.get("selected_papers", [])),
-                                evidence_count=len(final_state.get("extracted_evidence", [])),
-                            )
-                            st.success("Approved! Academic literature review synthesized.")
-                            rep_id = saved_rep.id if saved_rep else None
+                            _stream_graph_updates(graph, cmd, config)
+                            snap_done = graph.get_state(config)
+                            final_state = snap_done.values if snap_done else {}
+                            rep_id = _persist_completed_run(run, f"Systematic Review: {p_title}", final_state)
+                            approve_status.update(label="Approved! Academic literature review synthesized.", state="complete")
                             navigate_to("Report Library", run_id=run.id, project_id=run.project_id, report_id=rep_id)
                         except Exception as e:
+                            approve_status.update(label=f"Approval error: {e}", state="error")
                             st.error(f"Approval failed: {e}")
 
             with col_dec2:
                 rev_notes = st.text_input("Revision Guidance (Optional)", placeholder="e.g. Include more studies on benchmark validity")
                 if st.button("🔄 Request Revision Cycle", use_container_width=True):
-                    with st.spinner("Dispatching revision tasks to search workers..."):
+                    with st.status("Dispatching revision tasks to search workers...", expanded=True) as rev_status:
                         try:
                             cmd = Command(resume={"action": "request_revision", "feedback": rev_notes})
-                            final_state = graph.invoke(cmd, config=config)
+                            _stream_graph_updates(graph, cmd, config)
                             snapshot = graph.get_state(config)
+                            final_state = snapshot.values if snapshot else {}
                             if snapshot.next:
-                                DatabaseService.update_run_status(run_id=run.id, status="waiting_for_review", current_phase="human_review")
-                                st.info("Revision tasks completed. New review package ready.")
+                                DatabaseService.update_run_status(
+                                    run_id=run.id,
+                                    status="waiting_for_review",
+                                    current_phase="human_review",
+                                    papers_count=len(final_state.get("selected_papers", [])),
+                                    evidence_count=len(final_state.get("extracted_evidence", [])),
+                                )
+                                rev_status.update(label="Revision tasks completed. New review package ready.", state="complete")
+                                st.rerun()
                             else:
-                                DatabaseService.update_run_status(run_id=run.id, status="completed", current_phase="report_synthesized")
-                                st.success("Revisions completed and report synthesized.")
-                            st.rerun()
+                                rep_id = _persist_completed_run(run, f"Systematic Review: {p_title}", final_state)
+                                rev_status.update(label="Revisions completed and report synthesized.", state="complete")
+                                navigate_to("Report Library", run_id=run.id, project_id=run.project_id, report_id=rep_id)
                         except Exception as e:
+                            rev_status.update(label=f"Revision dispatch failed: {e}", state="error")
                             st.error(f"Revision dispatch failed: {e}")
 
             with col_dec3:
@@ -698,31 +766,30 @@ elif st.session_state.menu == "Report Library":
             p_title = proj.title if proj else "Project"
             st.caption(f"Project: **{p_title}** | Generated: {selected_report.created_at.strftime('%Y-%m-%d %H:%M')} | Report ID: `{selected_report.id}`")
 
+            # Build resilient objects for display and export
+            try:
+                rep_obj = _build_resilient_report_obj(selected_report)
+            except Exception:
+                rep_obj = None
+
+            rendered_md = (selected_report.markdown_content or "").strip()
+            if not rendered_md and rep_obj is not None:
+                rendered_md = ReportExporter.to_markdown(rep_obj)
+
             # Download Action Buttons
             col_d1, col_d2 = st.columns(2)
             with col_d1:
                 st.download_button(
                     "📥 Download Markdown (.md)",
-                    data=selected_report.markdown_content,
+                    data=rendered_md,
                     file_name=f"literature_review_{selected_report.id[:8]}.md",
                     mime="text/markdown",
                     use_container_width=True,
                 )
             with col_d2:
                 try:
-                    rep_data = json.loads(selected_report.report_json) if selected_report.report_json else {}
-                    rep_data.setdefault("project_id", selected_report.project_id)
-                    rep_data.setdefault("report_id", selected_report.id)
-                    rep_data.setdefault("title", selected_report.title)
-                    rep_data.setdefault("abstract", "Executive abstract of systematic literature synthesis.")
-                    rep_data.setdefault("introduction", rep_data.get("abstract", "Introduction to literature review."))
-                    rep_data.setdefault("comparative_analysis", "Thematic comparative analysis across literature.")
-                    rep_data.setdefault("limitations", "Threats to validity and empirical study limitations.")
-                    rep_data.setdefault("sections", [])
-                    rep_data.setdefault("references", [])
-                    rep_data.setdefault("citation_checks", [])
-                    rep_data.setdefault("research_gaps", [])
-                    rep_obj = ResearchReport.model_validate(rep_data)
+                    if rep_obj is None:
+                        rep_obj = _build_resilient_report_obj(selected_report)
                     pdf_tmp_path = os.path.join(os.environ.get("TEMP", "."), f"report_{selected_report.id[:8]}.pdf")
                     ReportExporter.export_pdf(rep_obj, pdf_tmp_path)
                     with open(pdf_tmp_path, "rb") as f:
@@ -738,4 +805,7 @@ elif st.session_state.menu == "Report Library":
                     st.caption(f"PDF compilation notice: {e}")
 
         # Render Markdown Content
-        st.markdown(selected_report.markdown_content)
+        if rendered_md:
+            st.markdown(rendered_md)
+        else:
+            st.warning("This report record has no rendered markdown content yet.")

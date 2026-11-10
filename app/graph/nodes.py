@@ -125,10 +125,18 @@ def retrieve_content_node(state: ResearchState) -> Dict[str, Any]:
     raw_selected = state.get("selected_papers", [])
     papers = [Paper.model_validate(p) for p in raw_selected]
 
+    existing_ids = {
+        c["paper_id"]
+        for c in state.get("paper_contents", [])
+        if isinstance(c, dict) and c.get("paper_id")
+    }
+
     retriever = PaperRetriever()
     contents: List[PaperContent] = []
 
     for paper in papers:
+        if paper.paper_id in existing_ids:
+            continue
         pdf_bytes = retriever.retrieve_pdf_bytes(paper)
         content = PDFParser.parse_paper(paper, pdf_bytes=pdf_bytes)
         contents.append(content)
@@ -146,12 +154,19 @@ def extract_evidence_node(state: ResearchState) -> Dict[str, Any]:
 
     papers = [Paper.model_validate(p) for p in raw_selected]
     content_map = {c["paper_id"]: PaperContent.model_validate(c) for c in raw_contents}
+    analyzed_ids = {
+        a["paper_id"]
+        for a in state.get("paper_analyses", [])
+        if isinstance(a, dict) and a.get("paper_id")
+    }
 
     extractor = ExtractorAgent()
     analyses: List[PaperAnalysis] = []
     evidence_records: List[Evidence] = []
 
     for paper in papers:
+        if paper.paper_id in analyzed_ids:
+            continue
         content = content_map.get(paper.paper_id)
         if not content:
             content = PDFParser.parse_paper(paper, pdf_bytes=None)
