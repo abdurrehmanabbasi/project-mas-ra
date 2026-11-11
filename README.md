@@ -1,6 +1,5 @@
 # Autonomous AI Research & Literature Review Assistant (MAS-RA)
 
-[![CI Test Suite & Migration Check](https://github.com/your-org/project-mas-ra/actions/workflows/ci.yml/badge.svg)](https://github.com/your-org/project-mas-ra/actions/workflows/ci.yml)
 [![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/downloads/release/python-3120/)
 [![LangGraph](https://img.shields.io/badge/orchestration-LangGraph-orange.svg)](https://github.com/langchain-ai/langgraph)
 [![FastAPI](https://img.shields.io/badge/backend-FastAPI-green.svg)](https://fastapi.tiangolo.com/)
