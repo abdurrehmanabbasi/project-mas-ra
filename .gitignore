@@ -3,7 +3,6 @@ __pycache__/
 *.py[cod]
 *$py.class
 .pptx
-Plan.md
 
 # Virtual Environments
 .venv/
